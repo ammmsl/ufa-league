@@ -56,14 +56,16 @@ interface GameDay {
 // ─── Schedule helpers ─────────────────────────────────────────────────────────
 
 /**
- * Returns all Tue/Fri dates within the season range, excluding the break.
+ * Returns all Tue/Fri dates within the season range, excluding the break period
+ * and any explicitly listed public holidays (YYYY-MM-DD strings).
  * Uses UTC date arithmetic to avoid timezone shifts on bare date strings.
  */
 function getSeasonGameDays(
   startDate: string,
   endDate: string,
   breakStart: string | null,
-  breakEnd: string | null
+  breakEnd: string | null,
+  holidayDates: string[] = []
 ): GameDay[] {
   // slice(0, 10) strips any time component ("2026-02-18T00:00:00Z" → "2026-02-18")
   const parse = (s: string) => {
@@ -74,6 +76,7 @@ function getSeasonGameDays(
   const endMs = parse(endDate)
   const bStartMs = breakStart ? parse(breakStart) : null
   const bEndMs = breakEnd ? parse(breakEnd) : null
+  const holidaySet = new Set(holidayDates.map((h) => h.slice(0, 10)))
 
   const days: GameDay[] = []
   let curr = startMs
@@ -81,8 +84,9 @@ function getSeasonGameDays(
     const d = new Date(curr)
     const dow = d.getUTCDay()
     if (dow === 2 || dow === 5) {
+      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
       const inBreak = bStartMs !== null && bEndMs !== null && curr >= bStartMs && curr <= bEndMs
-      if (!inBreak) {
+      if (!inBreak && !holidaySet.has(dateStr)) {
         days.push({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() })
       }
     }
@@ -94,6 +98,11 @@ function getSeasonGameDays(
 /**
  * Circle-method round-robin for N teams (odd → add dummy for bye).
  * Returns double round-robin: 2 × (N-1) rounds, each with ⌊N/2⌋ real games.
+ *
+ * Pairing-separation guarantee: rounds 0…(N-2) are the full single round-robin
+ * (every unique pairing meets exactly once). Rounds (N-1)…(2N-3) are the reverse
+ * (home/away swapped). This means no two teams play their rematch until ALL other
+ * pairings have had their first meeting — satisfying the constraint automatically.
  */
 function generateSchedule(teams: Team[]): Array<[Team, Team][]> {
   const list: (Team | null)[] = [...teams, null] // null = bye
@@ -114,7 +123,7 @@ function generateSchedule(teams: Team[]): Array<[Team, Team][]> {
     list[1] = last
   }
 
-  // Double round-robin: add reversed fixtures
+  // Double round-robin: add reversed fixtures (rematches only after all first legs done)
   return [...singleRounds, ...singleRounds.map((r) => r.map(([h, a]) => [a, h] as [Team, Team]))]
 }
 
@@ -157,6 +166,7 @@ interface DayCell {
   inSeason: boolean
   inBreak: boolean
   isGameDay: boolean
+  isHoliday: boolean
   fixtures: Fixture[]
 }
 
@@ -164,13 +174,15 @@ function buildMonth(
   year: number,
   month: number,
   season: Season,
-  fixtures: Fixture[]
+  fixtures: Fixture[],
+  holidayDates: string[] = []
 ): (DayCell | null)[][] {
   const parse = (s: string) => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, d) }
   const startMs = parse(season.start_date)
   const endMs = parse(season.end_date)
   const bStartMs = season.break_start ? parse(season.break_start) : null
   const bEndMs = season.break_end ? parse(season.break_end) : null
+  const holidaySet = new Set(holidayDates.map((h) => h.slice(0, 10)))
 
   // Index fixtures by MVT date
   const byDate: Record<string, Fixture[]> = {}
@@ -189,13 +201,15 @@ function buildMonth(
   for (let d = 1; d <= daysInMonth; d++) {
     const ms = Date.UTC(year, month - 1, d)
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    const dow = new Date(ms).getUTCDay()
     cells.push({
       dateStr,
       day: d,
-      dow: new Date(ms).getUTCDay(),
+      dow,
       inSeason: ms >= startMs && ms <= endMs,
       inBreak: bStartMs !== null && bEndMs !== null && ms >= bStartMs && ms <= bEndMs,
-      isGameDay: new Date(ms).getUTCDay() === 2 || new Date(ms).getUTCDay() === 5,
+      isGameDay: dow === 2 || dow === 5,
+      isHoliday: holidaySet.has(dateStr),
       fixtures: byDate[dateStr] ?? [],
     })
   }
@@ -215,10 +229,12 @@ const MONTH_NAMES = [
 function CalendarView({
   season,
   fixtures,
+  holidays,
   onDateClick,
 }: {
   season: Season
   fixtures: Fixture[]
+  holidays: string[]
   onDateClick: (dateStr: string) => void
 }) {
   const [sy, sm] = season.start_date.slice(0, 10).split('-').map(Number)
@@ -235,7 +251,7 @@ function CalendarView({
   return (
     <div className="space-y-5">
       {months.map(({ year, month }) => {
-        const weeks = buildMonth(year, month, season, fixtures)
+        const weeks = buildMonth(year, month, season, fixtures, holidays)
         return (
           <div key={`${year}-${month}`}>
             <p className="text-xs font-semibold text-gray-400 mb-1">
@@ -248,7 +264,8 @@ function CalendarView({
               {weeks.map((week, wi) =>
                 week.map((cell, di) => {
                   if (!cell) return <div key={`${wi}-${di}`} className="h-14 rounded" />
-                  const clickable = cell.inSeason && !cell.inBreak && cell.isGameDay
+                  const blocked = cell.inBreak || cell.isHoliday
+                  const clickable = cell.inSeason && !blocked && cell.isGameDay
                   return (
                     <div
                       key={cell.dateStr}
@@ -257,10 +274,13 @@ function CalendarView({
                         'h-14 rounded p-1 text-[10px] overflow-hidden',
                         clickable ? 'cursor-pointer hover:bg-gray-700 ring-1 ring-inset ring-blue-800' : 'bg-gray-900',
                         !cell.inSeason ? 'opacity-20' : '',
-                        cell.inBreak ? 'opacity-40' : '',
+                        blocked ? 'opacity-50' : '',
                       ].join(' ')}
                     >
-                      <div className={`font-medium mb-px ${cell.isGameDay && cell.inSeason && !cell.inBreak ? 'text-blue-400' : 'text-gray-600'}`}>
+                      <div className={`font-medium mb-px ${
+                        cell.isHoliday && cell.inSeason ? 'text-orange-400' :
+                        cell.isGameDay && cell.inSeason && !blocked ? 'text-blue-400' : 'text-gray-600'
+                      }`}>
                         {cell.day}
                       </div>
                       {cell.fixtures.slice(0, 2).map((f, i) => (
@@ -269,6 +289,9 @@ function CalendarView({
                         </div>
                       ))}
                       {cell.inBreak && <div className="text-gray-600 leading-3">break</div>}
+                      {cell.isHoliday && cell.inSeason && (
+                        <div className="text-orange-500 leading-3">holiday</div>
+                      )}
                     </div>
                   )
                 })
@@ -773,6 +796,10 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const [submitting, setSubmitting] = useState(false)
   const [lastCreated, setLastCreated] = useState('')
 
+  // Public holidays (persisted in localStorage keyed by season)
+  const [holidays, setHolidays] = useState<string[]>([])
+  const [newHoliday, setNewHoliday] = useState('')
+
   // Auto-schedule
   const [scheduling, setScheduling] = useState(false)
   const [schedProgress, setSchedProgress] = useState<{ n: number; total: number } | null>(null)
@@ -804,6 +831,35 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  // Load/save holidays from localStorage, keyed by season_id once it's known
+  useEffect(() => {
+    if (!season?.season_id) return
+    const stored = localStorage.getItem(`ufa_holidays_${season.season_id}`)
+    if (stored) setHolidays(JSON.parse(stored))
+  }, [season?.season_id])
+
+  useEffect(() => {
+    if (!season?.season_id) return
+    localStorage.setItem(`ufa_holidays_${season.season_id}`, JSON.stringify(holidays))
+  }, [holidays, season?.season_id])
+
+  function addHoliday() {
+    if (!newHoliday) return
+    setHolidays((prev) => prev.includes(newHoliday) ? prev : [...prev, newHoliday].sort())
+    setNewHoliday('')
+  }
+
+  function removeHoliday(date: string) {
+    setHolidays((prev) => prev.filter((d) => d !== date))
+  }
+
+  function fmtHoliday(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+    })
+  }
 
   function preSelectDate(dateStr: string) {
     setKickoff(`${dateStr}T20:30`)
@@ -851,7 +907,7 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
       setSchedError('Set season start and end dates in Step 1 first.')
       return
     }
-    const gameDays = getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end)
+    const gameDays = getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end, holidays)
     const rounds = generateSchedule(teams)
 
     // With 5 teams, every pair of consecutive rounds shares ≥3 players,
@@ -911,7 +967,7 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   if (loading) return <p className="text-gray-400">Loading…</p>
 
   const gameDayCount = season?.start_date && season?.end_date
-    ? getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end).length
+    ? getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end, holidays).length
     : 0
   const numRounds = teams.length > 0 ? generateSchedule(teams).length : 0
   // Each round needs 1 game day + 1 rest day (except last round); 10 rounds → 19 slots
@@ -949,6 +1005,40 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
       </div>
       {schedError && <p className="text-red-400 text-sm mb-4">{schedError}</p>}
 
+      {/* Public holidays */}
+      <div className="bg-gray-900 rounded-lg p-4 mb-6">
+        <p className="text-xs font-semibold text-gray-400 mb-2">
+          Public Holidays <span className="text-gray-600 font-normal">(excluded from scheduling and shown in orange on the calendar)</span>
+        </p>
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="date"
+            value={newHoliday}
+            onChange={(e) => setNewHoliday(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+          />
+          <button
+            onClick={addHoliday}
+            disabled={!newHoliday}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 rounded text-sm"
+          >
+            Add
+          </button>
+        </div>
+        {holidays.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {holidays.map((d) => (
+              <span key={d} className="flex items-center gap-1 bg-orange-950 border border-orange-800 text-orange-300 rounded-full px-2.5 py-0.5 text-xs">
+                {fmtHoliday(d)}
+                <button onClick={() => removeHoliday(d)} className="hover:text-white ml-0.5" title="Remove">✕</button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600 italic">No holidays added — all Tue/Fri slots within the season will be used.</p>
+        )}
+      </div>
+
       {/* Match matrix */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6">
         <p className="text-xs font-semibold text-gray-400 mb-3">
@@ -968,7 +1058,7 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
             Calendar — click a Tue/Fri to set that date in the form
           </p>
           {season?.start_date && season?.end_date
-            ? <CalendarView season={season} fixtures={fixtures} onDateClick={preSelectDate} />
+            ? <CalendarView season={season} fixtures={fixtures} holidays={holidays} onDateClick={preSelectDate} />
             : <p className="text-gray-600 text-sm">Set season dates in Step 1 to see the calendar.</p>
           }
         </div>
