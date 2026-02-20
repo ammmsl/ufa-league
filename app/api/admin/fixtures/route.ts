@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // kickoff_time must arrive as an offset-aware ISO string, e.g. "2026-03-10T20:30:00+05:00"
   const result = await sql`
     INSERT INTO fixtures
       (season_id, home_team_id, away_team_id, kickoff_time, venue, matchweek)
@@ -51,4 +50,19 @@ export async function POST(req: NextRequest) {
   `
 
   return NextResponse.json(result[0], { status: 201 })
+}
+
+/** Delete all fixtures for the current season (used by auto-schedule reset). */
+export async function DELETE() {
+  const season = await sql`
+    SELECT season_id FROM seasons ORDER BY created_at DESC LIMIT 1
+  `
+  if (season.length === 0) {
+    return NextResponse.json({ error: 'No season found' }, { status: 404 })
+  }
+
+  const result = await sql`
+    DELETE FROM fixtures WHERE season_id = ${season[0].season_id} RETURNING match_id
+  `
+  return NextResponse.json({ deleted: result.length })
 }
