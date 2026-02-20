@@ -65,8 +65,9 @@ function getSeasonGameDays(
   breakStart: string | null,
   breakEnd: string | null
 ): GameDay[] {
+  // slice(0, 10) strips any time component ("2026-02-18T00:00:00Z" → "2026-02-18")
   const parse = (s: string) => {
-    const [y, m, d] = s.split('-').map(Number)
+    const [y, m, d] = s.slice(0, 10).split('-').map(Number)
     return Date.UTC(y, m - 1, d)
   }
   const startMs = parse(startDate)
@@ -165,7 +166,7 @@ function buildMonth(
   season: Season,
   fixtures: Fixture[]
 ): (DayCell | null)[][] {
-  const parse = (s: string) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d) }
+  const parse = (s: string) => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, d) }
   const startMs = parse(season.start_date)
   const endMs = parse(season.end_date)
   const bStartMs = season.break_start ? parse(season.break_start) : null
@@ -220,8 +221,8 @@ function CalendarView({
   fixtures: Fixture[]
   onDateClick: (dateStr: string) => void
 }) {
-  const [sy, sm] = season.start_date.split('-').map(Number)
-  const [ey, em] = season.end_date.split('-').map(Number)
+  const [sy, sm] = season.start_date.slice(0, 10).split('-').map(Number)
+  const [ey, em] = season.end_date.slice(0, 10).split('-').map(Number)
 
   const months: { year: number; month: number }[] = []
   let cy = sy, cm = sm
@@ -853,8 +854,12 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
     const gameDays = getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end)
     const rounds = generateSchedule(teams)
 
-    if (gameDays.length < rounds.length) {
-      setSchedError(`Not enough game days: need ${rounds.length} Tue/Fri slots, found ${gameDays.length}.`)
+    // With 5 teams, every pair of consecutive rounds shares ≥3 players,
+    // so a rest day must be skipped between each round.
+    // n rounds require game day indices 0, 2, 4, … 2*(n-1) → need 2n-1 total slots.
+    const slotsNeeded = rounds.length * 2 - 1
+    if (gameDays.length < slotsNeeded) {
+      setSchedError(`Not enough game days: need ${slotsNeeded} Tue/Fri slots (1 rest between each matchweek), found ${gameDays.length}.`)
       return
     }
 
@@ -874,7 +879,8 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
 
     let n = 0
     for (let i = 0; i < rounds.length; i++) {
-      const gd = gameDays[i]
+      // Skip every other game day so no team plays on back-to-back game days
+      const gd = gameDays[i * 2]
       const mw = i + 1
       for (const [home, away] of rounds[i]) {
         const res = await fetch('/api/admin/fixtures', {
@@ -907,21 +913,29 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const gameDayCount = season?.start_date && season?.end_date
     ? getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end).length
     : 0
-  const totalNeeded = teams.length > 0 ? generateSchedule(teams).length : 0
+  const numRounds = teams.length > 0 ? generateSchedule(teams).length : 0
+  // Each round needs 1 game day + 1 rest day (except last round); 10 rounds → 19 slots
+  const slotsNeeded = numRounds > 0 ? numRounds * 2 - 1 : 0
+  const totalFixtures = numRounds * 2 // 2 games per round
 
   return (
     <div className="max-w-5xl">
       <h2 className="text-xl font-semibold mb-1">Step 3 — Fixtures</h2>
       <p className="text-gray-400 text-sm mb-5">
-        Auto-schedule all {totalNeeded * 2} games, or add them individually. Click the matrix or calendar to pre-fill the form.
+        Auto-schedule all {totalFixtures} games across {numRounds} matchweeks, or add them individually. Click the matrix or calendar to pre-fill the form.
       </p>
 
       {/* Stats + auto-schedule */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="flex gap-4 text-sm text-gray-400">
-          <span><span className="text-white font-semibold">{fixtures.length}</span> / {totalNeeded * 2} fixtures</span>
+          <span><span className="text-white font-semibold">{fixtures.length}</span> / {totalFixtures} fixtures</span>
           <span><span className="text-white font-semibold">{gameDayCount}</span> game days</span>
-          <span><span className={gameDayCount >= totalNeeded ? 'text-green-400' : 'text-red-400'}>{gameDayCount >= totalNeeded ? '✓' : '✗'}</span> {totalNeeded} needed</span>
+          <span>
+            <span className={gameDayCount >= slotsNeeded ? 'text-green-400' : 'text-red-400'}>
+              {gameDayCount >= slotsNeeded ? '✓' : '✗'}
+            </span>
+            {' '}{slotsNeeded} slots needed
+          </span>
         </div>
         <button
           onClick={handleAutoSchedule}
