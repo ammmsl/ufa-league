@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({ ok: true })
   response.cookies.set(COOKIE_NAME_EXPORT, token, {
-    httpOnly: true,      // not accessible from JavaScript
-    secure: true,        // HTTPS only
-    sameSite: 'strict',  // CSRF protection
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     maxAge: 60 * 60 * 24 * 7,  // 7 days in seconds
     path: '/',
   })

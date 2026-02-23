@@ -1,7 +1,7 @@
 # UFA League Tracker — Build Progress
 
-**Last updated:** 2026-02-21
-**Branch:** `claude/build-league-tracker-FyNCE`
+**Last updated:** 2026-02-24
+**Branch:** `claude/frisbee-league-tracker-cPWWk`
 **Stack:** Next.js 16.1.6 · React 19 · Tailwind CSS v4 · Supabase (plain Postgres) · Vercel
 
 ---
@@ -57,7 +57,7 @@ All 8 tables created in Supabase:
 
 ### Auth files
 - `lib/auth.ts` — JWT sign/verify, 7-day expiry, `Indian/Maldives` timezone
-- `middleware.ts` — protects all `/admin/*` and `/api/admin/*` routes
+- `proxy.ts` — protects all `/admin/*` and `/api/admin/*` routes (Next.js 16: renamed from `middleware.ts`)
 - `app/api/admin/login/route.ts` — POST, bcryptjs comparison, sets httpOnly cookie
 - `app/admin/login/page.tsx` — login form
 
@@ -84,7 +84,7 @@ All `[dynamic]` routes use `await params` pattern for Next.js 16 async params.
 - Shows season status, team/player/fixture counts
 - Link to setup wizard
 
-**`app/admin/setup/page.tsx`** (client component, ~1250 lines)
+**`app/admin/setup/page.tsx`** (client component, ~1400 lines)
 - 4-step wizard with step indicator
 
 ### Wizard steps
@@ -96,15 +96,16 @@ All `[dynamic]` routes use `await params` pattern for Next.js 16 async params.
 **Step 2 — Teams**
 - List all 5 teams with inline rename (PATCH to `/api/admin/teams/[teamId]`)
 - Player roster shown per team for reference
+- **Draft order** — ▲▼ buttons reorder teams; order persisted to localStorage keyed by season_id; Step 3 auto-scheduler respects this order when assigning home/away slots
 
 **Step 3 — Fixtures** (most complex step)
 - Stats bar: fixture count, game day count, slots needed indicator
-- Auto-schedule button (circle-method double round-robin, 20 fixtures across 10 matchweeks)
-- Public holidays panel (add/remove date ranges; excluded from scheduling; shown orange on calendar)
+- Auto-schedule button (5-team fixed pairing table, double round-robin, 20 fixtures across 10 matchweeks)
+- Public holidays panel — **date ranges** with start, end, and name; backward-compatible with old single-date format; excluded from scheduling; shown orange on calendar
 - Match matrix (5×5 — click a cell to pre-fill the add form)
-- Calendar view (all season months; Tue/Fri highlighted blue; breaks dimmed; holidays orange)
+- Calendar view with **Adjust Mode** — toggle to select a fixture (amber highlight), valid move targets shown green, invalid shown red with reason tooltip, click green date PATCHes fixture
 - Inline "Add fixture" form (pre-filled from matrix/calendar clicks)
-- Fixture list grouped by matchweek with inline edit (all fields) and delete per fixture
+- Fixture list grouped by matchweek with inline edit (all fields) and delete per fixture; Adjust Mode replaces Edit/Delete with selection
 
 **Step 4 — Launch**
 - Summary: season name, status, team/player/fixture counts
@@ -122,34 +123,34 @@ All `[dynamic]` routes use `await params` pattern for Next.js 16 async params.
 
 ### Auto-scheduler rules (as implemented)
 
-1. **Circle-method double round-robin** — generates all 10 unique pairings first (single rounds), then reverses for second legs. Guarantees no rematch until every first leg is played.
-2. **No back-to-back game days** — with 5 teams every two consecutive rounds share ≥3 players, so rounds are placed on `gameDays[i * 2]` (skipping a rest day between each matchweek). Requires `2n − 1` game-day slots for `n` rounds (10 rounds → 19 slots needed).
-3. **No play on public holidays** — `getSeasonGameDays()` filters out any dates in the holiday list.
+1. **5-team fixed pairing table** (`FIVE_TEAM_SINGLE_RR` constant): 5 single-leg rounds covering all 10 unique pairs:
+   - R1: 1v2, 3v4 (bye: 5)
+   - R2: 5v1, 2v3 (bye: 4)
+   - R3: 2v4, 3v5 (bye: 1)
+   - R4: 1v3, 4v5 (bye: 2)
+   - R5: 1v4, 2v5 (bye: 3)
+   Then repeated with home/away swapped for the second leg (10 rounds total, 20 fixtures). General circle-method kept as fallback for non-5-team leagues.
+2. **No back-to-back game days** — rounds placed on `gameDays[i * 2]`. Adjacent Tue↔Fri slots are 3–4 calendar days apart, caught by `diff <= 4 * 86_400_000` in `isBackToBack()`.
+3. **No play on public holidays** — `getSeasonGameDays()` expands `HolidayRange[]` via `buildHolidaySet()` to a flat `Set<string>` for O(1) lookup.
 4. **Two matches per game day allowed** — multiple fixtures can share a kickoff date (each round has 2 games).
 
 ### Known bugs fixed in Phase 3
 
 - **Date parsing** — Supabase returns full ISO timestamps (`"2026-02-18T00:00:00+00:00"`). All date arithmetic uses `s.slice(0, 10)` before `split('-')` to avoid `NaN`.
 - **Auto-scheduler "found 0 game days"** — was caused by the above parsing bug + validation threshold using `rounds.length` instead of `rounds.length * 2 - 1`.
+- **`lib/db.ts` missing `prepare: false`** — Supabase pgBouncer transaction mode (port 6543) requires this flag. Without it, postgres package used named prepared statements that can't be routed across multiple backends, causing corrupt wire-protocol responses and 500 errors with empty bodies.
+- **`loadAll()` unconditional `.json()` call** — added `res.ok` check before parsing JSON, wrapped in try/catch, added `loadError` state with Retry button to surface DB errors gracefully.
 
 ---
 
-## Pending Work
+## Local Dev Setup
 
-### Phase 3 amendments not yet implemented
+Local development is now working. Key findings recorded here for future reference:
 
-#### 1. Holiday date ranges
-Currently holidays are stored as individual `YYYY-MM-DD` strings. Requested change: input a start + end date range with optional name (to block long weekends). Planned interface:
-```typescript
-interface HolidayRange { id: string; start: string; end: string; name: string }
-```
-Affects: `getSeasonGameDays`, `buildMonth`, `CalendarView`, `Step3Fixtures` UI, localStorage persistence.
-
-#### 2. Adjust mode
-Requested: a toggle in the fixture list that enables dragging/moving fixtures by clicking a destination date on the calendar. Rules:
-- Auto-scheduler rules apply (no back-to-back, no holiday, no same-day team conflict)
-- Valid target dates highlighted green, invalid dimmed/red, current date amber
-- If a move would break rules, user must use the "Edit" button instead (direct edit bypasses rule checking)
+- **`proxy.ts`** is the Next.js 16 convention (replaces `middleware.ts`). The file index below still said `middleware.ts` — corrected.
+- **Cookie `secure` flag** — set to `process.env.NODE_ENV === 'production'` so httpOnly cookie is sent over plain HTTP on localhost.
+- **`next.config.ts`** — added `turbopack.root: path.resolve(__dirname)` to fix workspace root misdetection (Next.js was picking up a stray `package-lock.json` at `C:\Users\Amsal\`).
+- **`.env.local` dollar-sign escaping** — `dotenv-expand` (used internally by Next.js) performs `$VAR` interpolation on all env values. Any value containing `$` (bcrypt hashes, JWT secrets) must escape dollar signs as `\$`. The escape is resolved after interpolation, so the runtime value is correct.
 
 ---
 
@@ -210,7 +211,7 @@ ufa-league/
 │   ├── auth.ts        # JWT sign/verify, getAdminSession
 │   ├── db.ts          # Postgres client (max:1, ssl:require)
 │   └── schedule.ts    # Game day helpers, auto-scheduler math
-├── middleware.ts       # JWT guard for /admin/* and /api/admin/*
+├── proxy.ts            # JWT guard for /admin/* and /api/admin/* (Next.js 16 convention)
 └── docs/
     ├── UFA-League-Tracker-Implementation-Plan-v1.2.md
     ├── UFA-League-Tracker-Technical-Specification-v1.1.md

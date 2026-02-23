@@ -15,6 +15,7 @@ function init() {
     _sql = postgres(process.env.DATABASE_URL!, {
       max: 1,       // one connection per serverless function instance
       ssl: 'require',
+      prepare: false, // required for Supabase pgBouncer transaction mode (port 6543)
     })
   }
   return _sql

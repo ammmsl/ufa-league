@@ -53,11 +53,39 @@ interface GameDay {
   day: number
 }
 
+interface HolidayRange {
+  id: string
+  start: string  // YYYY-MM-DD
+  end: string    // YYYY-MM-DD
+  name: string
+}
+
 // ─── Schedule helpers ─────────────────────────────────────────────────────────
 
 /**
+ * Expands an array of holiday ranges into a flat Set of YYYY-MM-DD strings.
+ */
+function buildHolidaySet(holidays: HolidayRange[]): Set<string> {
+  const parse = (s: string) => {
+    const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  const set = new Set<string>()
+  for (const h of holidays) {
+    let curr = parse(h.start)
+    const end = parse(h.end)
+    while (curr <= end) {
+      const d = new Date(curr)
+      set.add(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`)
+      curr += 86_400_000
+    }
+  }
+  return set
+}
+
+/**
  * Returns all Tue/Fri dates within the season range, excluding the break period
- * and any explicitly listed public holidays (YYYY-MM-DD strings).
+ * and any public holiday ranges.
  * Uses UTC date arithmetic to avoid timezone shifts on bare date strings.
  */
 function getSeasonGameDays(
@@ -65,9 +93,8 @@ function getSeasonGameDays(
   endDate: string,
   breakStart: string | null,
   breakEnd: string | null,
-  holidayDates: string[] = []
+  holidays: HolidayRange[] = []
 ): GameDay[] {
-  // slice(0, 10) strips any time component ("2026-02-18T00:00:00Z" → "2026-02-18")
   const parse = (s: string) => {
     const [y, m, d] = s.slice(0, 10).split('-').map(Number)
     return Date.UTC(y, m - 1, d)
@@ -76,7 +103,7 @@ function getSeasonGameDays(
   const endMs = parse(endDate)
   const bStartMs = breakStart ? parse(breakStart) : null
   const bEndMs = breakEnd ? parse(breakEnd) : null
-  const holidaySet = new Set(holidayDates.map((h) => h.slice(0, 10)))
+  const holidaySet = buildHolidaySet(holidays)
 
   const days: GameDay[] = []
   let curr = startMs
@@ -96,16 +123,41 @@ function getSeasonGameDays(
 }
 
 /**
- * Circle-method round-robin for N teams (odd → add dummy for bye).
- * Returns double round-robin: 2 × (N-1) rounds, each with ⌊N/2⌋ real games.
+ * Fixed pairing table for 5 teams (0-indexed draft positions).
+ * Gives: R1 1v2 3v4, R2 5v1 2v3, R3 2v4 3v5, R4 1v3 4v5, R5 1v4 2v5.
+ * Every unique pair appears exactly once across the 5 rounds.
+ */
+const FIVE_TEAM_SINGLE_RR: [number, number][][] = [
+  [[0, 1], [2, 3]], // R1: 1v2, 3v4  (bye: 5)
+  [[4, 0], [1, 2]], // R2: 5v1, 2v3  (bye: 4)
+  [[1, 3], [2, 4]], // R3: 2v4, 3v5  (bye: 1)
+  [[0, 2], [3, 4]], // R4: 1v3, 4v5  (bye: 2)
+  [[0, 3], [1, 4]], // R5: 1v4, 2v5  (bye: 3)
+]
+
+/**
+ * Returns a double round-robin schedule as an array of rounds, where each
+ * round is an array of [home, away] team pairs.
  *
- * Pairing-separation guarantee: rounds 0…(N-2) are the full single round-robin
- * (every unique pairing meets exactly once). Rounds (N-1)…(2N-3) are the reverse
- * (home/away swapped). This means no two teams play their rematch until ALL other
- * pairings have had their first meeting — satisfying the constraint automatically.
+ * For 5 teams: uses the fixed pairing table above so the first game is always
+ * the top two draft picks, then seeds 3&4, then seed 5 plays seed 1, etc.
+ * Second half swaps home/away (rematches only after all first legs are done).
+ *
+ * For other team counts: falls back to the circle method.
  */
 function generateSchedule(teams: Team[]): Array<[Team, Team][]> {
-  const list: (Team | null)[] = [...teams, null] // null = bye
+  if (teams.length === 5) {
+    const singleRounds: Array<[Team, Team][]> = FIVE_TEAM_SINGLE_RR.map((round) =>
+      round.map(([hi, ai]) => [teams[hi], teams[ai]] as [Team, Team])
+    )
+    return [
+      ...singleRounds,
+      ...singleRounds.map((r) => r.map(([h, a]) => [a, h] as [Team, Team])),
+    ]
+  }
+
+  // General circle-method for other team counts (odd → add dummy bye)
+  const list: (Team | null)[] = [...teams, null]
   const n = list.length
 
   const singleRounds: Array<[Team, Team][]> = []
@@ -123,7 +175,6 @@ function generateSchedule(teams: Team[]): Array<[Team, Team][]> {
     list[1] = last
   }
 
-  // Double round-robin: add reversed fixtures (rematches only after all first legs done)
   return [...singleRounds, ...singleRounds.map((r) => r.map(([h, a]) => [a, h] as [Team, Team]))]
 }
 
@@ -157,6 +208,41 @@ function fmtKickoff(utcIso: string): string {
   })
 }
 
+/** Returns the MVT calendar date (YYYY-MM-DD) for a UTC ISO kickoff string. */
+function getFixtureMVTDate(utcIso: string): string {
+  const mvt = new Date(new Date(utcIso).getTime() + 5 * 3600_000)
+  return `${mvt.getUTCFullYear()}-${String(mvt.getUTCMonth() + 1).padStart(2, '0')}-${String(mvt.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * Returns true if moving `fixture` to `dateStr` would create a back-to-back
+ * (adjacent game day, i.e. Tue↔Fri — always 3 or 4 calendar days apart) for
+ * either of the fixture's teams.
+ */
+function isBackToBack(dateStr: string, fixture: Fixture, allFixtures: Fixture[]): boolean {
+  const parse = (s: string) => {
+    const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  const targetMs = parse(dateStr)
+  const FOUR_DAYS_MS = 4 * 86_400_000
+  for (const f of allFixtures) {
+    if (f.match_id === fixture.match_id) continue
+    // Only care about fixtures that share at least one team
+    if (
+      f.home_team_id !== fixture.home_team_id &&
+      f.home_team_id !== fixture.away_team_id &&
+      f.away_team_id !== fixture.home_team_id &&
+      f.away_team_id !== fixture.away_team_id
+    ) continue
+    const fMs = parse(getFixtureMVTDate(f.kickoff_time))
+    const diff = Math.abs(fMs - targetMs)
+    // Adjacent game days (Tue↔Fri) are always 3 or 4 days apart
+    if (diff > 0 && diff <= FOUR_DAYS_MS) return true
+  }
+  return false
+}
+
 // ─── Calendar view ────────────────────────────────────────────────────────────
 
 interface DayCell {
@@ -175,20 +261,19 @@ function buildMonth(
   month: number,
   season: Season,
   fixtures: Fixture[],
-  holidayDates: string[] = []
+  holidays: HolidayRange[] = []
 ): (DayCell | null)[][] {
   const parse = (s: string) => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, d) }
   const startMs = parse(season.start_date)
   const endMs = parse(season.end_date)
   const bStartMs = season.break_start ? parse(season.break_start) : null
   const bEndMs = season.break_end ? parse(season.break_end) : null
-  const holidaySet = new Set(holidayDates.map((h) => h.slice(0, 10)))
+  const holidaySet = buildHolidaySet(holidays)
 
   // Index fixtures by MVT date
   const byDate: Record<string, Fixture[]> = {}
   for (const f of fixtures) {
-    const mvt = new Date(new Date(f.kickoff_time).getTime() + 5 * 3600_000)
-    const k = `${mvt.getUTCFullYear()}-${String(mvt.getUTCMonth() + 1).padStart(2, '0')}-${String(mvt.getUTCDate()).padStart(2, '0')}`
+    const k = getFixtureMVTDate(f.kickoff_time)
     if (!byDate[k]) byDate[k] = []
     byDate[k].push(f)
   }
@@ -231,11 +316,15 @@ function CalendarView({
   fixtures,
   holidays,
   onDateClick,
+  adjustMode = false,
+  selectedFixture = null,
 }: {
   season: Season
   fixtures: Fixture[]
-  holidays: string[]
+  holidays: HolidayRange[]
   onDateClick: (dateStr: string) => void
+  adjustMode?: boolean
+  selectedFixture?: Fixture | null
 }) {
   const [sy, sm] = season.start_date.slice(0, 10).split('-').map(Number)
   const [ey, em] = season.end_date.slice(0, 10).split('-').map(Number)
@@ -247,6 +336,9 @@ function CalendarView({
     cm++
     if (cm > 12) { cm = 1; cy++ }
   }
+
+  // The current date of the selected fixture (used for "current" highlight)
+  const selectedFixtureDate = selectedFixture ? getFixtureMVTDate(selectedFixture.kickoff_time) : null
 
   return (
     <div className="space-y-5">
@@ -265,26 +357,94 @@ function CalendarView({
                 week.map((cell, di) => {
                   if (!cell) return <div key={`${wi}-${di}`} className="h-14 rounded" />
                   const blocked = cell.inBreak || cell.isHoliday
-                  const clickable = cell.inSeason && !blocked && cell.isGameDay
+
+                  // ── Adjust-mode validity ──────────────────────────────────
+                  let moveValidity: 'valid' | 'invalid' | 'current' | null = null
+                  if (adjustMode && selectedFixture && cell.isGameDay && cell.inSeason && !blocked) {
+                    if (cell.dateStr === selectedFixtureDate) {
+                      moveValidity = 'current'
+                    } else {
+                      const sameDayConflict = fixtures.some(
+                        (f) =>
+                          f.match_id !== selectedFixture.match_id &&
+                          getFixtureMVTDate(f.kickoff_time) === cell.dateStr &&
+                          (f.home_team_id === selectedFixture.home_team_id ||
+                            f.home_team_id === selectedFixture.away_team_id ||
+                            f.away_team_id === selectedFixture.home_team_id ||
+                            f.away_team_id === selectedFixture.away_team_id)
+                      )
+                      if (sameDayConflict || isBackToBack(cell.dateStr, selectedFixture, fixtures)) {
+                        moveValidity = 'invalid'
+                      } else {
+                        moveValidity = 'valid'
+                      }
+                    }
+                  }
+
+                  // ── Click eligibility ────────────────────────────────────
+                  const clickable =
+                    adjustMode && selectedFixture
+                      ? moveValidity === 'valid'
+                      : cell.inSeason && !blocked && cell.isGameDay
+
+                  // ── Cell background / ring ───────────────────────────────
+                  let cellClass = 'bg-gray-900'
+                  if (adjustMode && selectedFixture && moveValidity) {
+                    if (moveValidity === 'valid')
+                      cellClass = 'bg-green-900/40 ring-1 ring-inset ring-green-700 cursor-pointer hover:bg-green-800/60'
+                    else if (moveValidity === 'current')
+                      cellClass = 'bg-amber-900/50 ring-1 ring-inset ring-amber-600'
+                    else if (moveValidity === 'invalid')
+                      cellClass = 'bg-red-900/30 ring-1 ring-inset ring-red-900'
+                  } else if (!adjustMode && clickable) {
+                    cellClass = 'cursor-pointer hover:bg-gray-700 ring-1 ring-inset ring-blue-800'
+                  }
+
+                  // ── Day number colour ────────────────────────────────────
+                  const dayNumClass =
+                    moveValidity === 'current'
+                      ? 'text-amber-400'
+                      : moveValidity === 'valid'
+                      ? 'text-green-400'
+                      : moveValidity === 'invalid'
+                      ? 'text-red-500'
+                      : cell.isHoliday && cell.inSeason
+                      ? 'text-orange-400'
+                      : cell.isGameDay && cell.inSeason && !blocked
+                      ? 'text-blue-400'
+                      : 'text-gray-600'
+
                   return (
                     <div
                       key={cell.dateStr}
                       onClick={clickable ? () => onDateClick(cell.dateStr) : undefined}
+                      title={
+                        moveValidity === 'invalid'
+                          ? 'Invalid: same-day team conflict or back-to-back game days'
+                          : moveValidity === 'current'
+                          ? 'Current fixture date'
+                          : undefined
+                      }
                       className={[
                         'h-14 rounded p-1 text-[10px] overflow-hidden',
-                        clickable ? 'cursor-pointer hover:bg-gray-700 ring-1 ring-inset ring-blue-800' : 'bg-gray-900',
+                        cellClass,
                         !cell.inSeason ? 'opacity-20' : '',
-                        blocked ? 'opacity-50' : '',
+                        blocked && !adjustMode ? 'opacity-50' : '',
                       ].join(' ')}
                     >
-                      <div className={`font-medium mb-px ${
-                        cell.isHoliday && cell.inSeason ? 'text-orange-400' :
-                        cell.isGameDay && cell.inSeason && !blocked ? 'text-blue-400' : 'text-gray-600'
-                      }`}>
+                      <div className={`font-medium mb-px ${dayNumClass}`}>
                         {cell.day}
                       </div>
                       {cell.fixtures.slice(0, 2).map((f, i) => (
-                        <div key={i} className="bg-blue-900 text-blue-100 rounded px-0.5 mb-px leading-3 truncate">
+                        <div
+                          key={i}
+                          className={[
+                            'rounded px-0.5 mb-px leading-3 truncate',
+                            adjustMode && selectedFixture && f.match_id === selectedFixture.match_id
+                              ? 'bg-amber-700 text-amber-100'
+                              : 'bg-blue-900 text-blue-100',
+                          ].join(' ')}
+                        >
                           {abbrev(f.home_team_name)}v{abbrev(f.away_team_name)}
                         </div>
                       ))}
@@ -476,14 +636,25 @@ function FixtureList({
   teams,
   onFixtureUpdated,
   onFixtureDeleted,
+  adjustMode = false,
+  selectedFixtureId = null,
+  onFixtureSelect,
 }: {
   fixtures: Fixture[]
   teams: Team[]
   onFixtureUpdated: (f: Fixture) => void
   onFixtureDeleted: (matchId: string) => void
+  adjustMode?: boolean
+  selectedFixtureId?: string | null
+  onFixtureSelect?: (matchId: string) => void
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+
+  // Exit any open edit when adjust mode activates
+  useEffect(() => {
+    if (adjustMode) setEditingId(null)
+  }, [adjustMode])
 
   const sorted = [...fixtures].sort((a, b) => {
     if (a.matchweek !== b.matchweek) return a.matchweek - b.matchweek
@@ -518,7 +689,7 @@ function FixtureList({
           <div className="space-y-1">
             {mwFixtures.map((f) => (
               <div key={f.match_id}>
-                {editingId === f.match_id ? (
+                {editingId === f.match_id && !adjustMode ? (
                   <EditFixtureForm
                     fixture={f}
                     teams={teams}
@@ -526,7 +697,17 @@ function FixtureList({
                     onCancel={() => setEditingId(null)}
                   />
                 ) : (
-                  <div className="flex items-center gap-2 bg-gray-900 rounded px-3 py-2 text-sm">
+                  <div
+                    onClick={adjustMode ? () => onFixtureSelect?.(f.match_id) : undefined}
+                    className={[
+                      'flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors',
+                      adjustMode
+                        ? selectedFixtureId === f.match_id
+                          ? 'bg-amber-900/50 ring-1 ring-inset ring-amber-600 cursor-pointer'
+                          : 'bg-gray-900 hover:bg-gray-800 cursor-pointer'
+                        : 'bg-gray-900',
+                    ].join(' ')}
+                  >
                     <span className="text-xs text-gray-500 w-32 shrink-0">{fmtKickoff(f.kickoff_time)}</span>
                     <span className="flex-1 min-w-0 truncate">
                       <span className="font-medium">{f.home_team_name}</span>
@@ -534,12 +715,19 @@ function FixtureList({
                       <span>{f.away_team_name}</span>
                     </span>
                     <span className="text-xs text-gray-600 hidden sm:block shrink-0">{f.venue}</span>
-                    <button onClick={() => setEditingId(f.match_id)}
-                      className="text-xs text-blue-400 hover:text-blue-300 shrink-0">Edit</button>
-                    <button onClick={() => handleDelete(f.match_id)} disabled={deleting === f.match_id}
-                      className="text-xs text-red-500 hover:text-red-400 disabled:opacity-50 shrink-0">
-                      {deleting === f.match_id ? '…' : 'Del'}
-                    </button>
+                    {!adjustMode && (
+                      <>
+                        <button onClick={() => setEditingId(f.match_id)}
+                          className="text-xs text-blue-400 hover:text-blue-300 shrink-0">Edit</button>
+                        <button onClick={() => handleDelete(f.match_id)} disabled={deleting === f.match_id}
+                          className="text-xs text-red-500 hover:text-red-400 disabled:opacity-50 shrink-0">
+                          {deleting === f.match_id ? '…' : 'Del'}
+                        </button>
+                      </>
+                    )}
+                    {adjustMode && selectedFixtureId === f.match_id && (
+                      <span className="text-xs text-amber-400 shrink-0">selected</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -690,20 +878,59 @@ function DateField({
   )
 }
 
-// ─── Step 2: Team naming ──────────────────────────────────────────────────────
+// ─── Step 2: Team naming + draft order ───────────────────────────────────────
+
+const TEAM_ORDER_KEY = (seasonId: string) => `ufa_team_order_${seasonId}`
 
 function Step2Teams({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const [teams, setTeams] = useState<Team[]>([])
+  // orderedIds drives display order and is the value persisted to localStorage
+  const [orderedIds, setOrderedIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const loadTeams = useCallback(() => {
-    fetch('/api/admin/teams').then((r) => r.json()).then(setTeams).catch(() => setError('Failed to load teams'))
+    fetch('/api/admin/teams')
+      .then((r) => r.json())
+      .then((data: Team[]) => {
+        setTeams(data)
+        if (data.length === 0) return
+        const seasonId = data[0].season_id
+        try {
+          const stored = localStorage.getItem(TEAM_ORDER_KEY(seasonId))
+          if (stored) {
+            const order: string[] = JSON.parse(stored)
+            // Only use stored order if every team_id is still present
+            const valid = data.every((t) => order.includes(t.team_id)) && order.length === data.length
+            setOrderedIds(valid ? order : data.map((t) => t.team_id))
+          } else {
+            setOrderedIds(data.map((t) => t.team_id))
+          }
+        } catch {
+          setOrderedIds(data.map((t) => t.team_id))
+        }
+      })
+      .catch(() => setError('Failed to load teams'))
   }, [])
 
   useEffect(() => { loadTeams() }, [loadTeams])
+
+  // Sorted view — derived from orderedIds
+  const sortedTeams = orderedIds
+    .map((id) => teams.find((t) => t.team_id === id))
+    .filter((t): t is Team => !!t)
+
+  function moveTeam(idx: number, dir: -1 | 1) {
+    const swap = idx + dir
+    if (swap < 0 || swap >= orderedIds.length) return
+    const next = [...orderedIds]
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    setOrderedIds(next)
+    const seasonId = teams[0]?.season_id
+    if (seasonId) localStorage.setItem(TEAM_ORDER_KEY(seasonId), JSON.stringify(next))
+  }
 
   async function saveEdit(teamId: string) {
     if (!editValue.trim()) return
@@ -723,15 +950,36 @@ function Step2Teams({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-xl font-semibold mb-1">Step 2 — Team Naming</h2>
-      <p className="text-gray-400 text-sm mb-6">Click Rename to edit a team name. Rosters shown for reference.</p>
+      <h2 className="text-xl font-semibold mb-1">Step 2 — Teams</h2>
+      <p className="text-gray-400 text-sm mb-1">Rename teams and set the draft order. The auto-scheduler uses this order to assign home/away pairings.</p>
+      <p className="text-gray-600 text-xs mb-6">Use the ▲ ▼ arrows to reorder. Order is saved automatically.</p>
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
       <div className="space-y-3 mb-6">
-        {teams.map((team) => (
+        {sortedTeams.map((team, idx) => (
           <div key={team.team_id} className="bg-gray-900 rounded-lg p-4">
             <div className="flex items-center gap-3 mb-2">
+              {/* Draft position + reorder buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-gray-600 text-xs font-mono w-4 text-right">{idx + 1}</span>
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => moveTeam(idx, -1)}
+                    disabled={idx === 0}
+                    className="text-gray-500 hover:text-white disabled:opacity-20 leading-none px-0.5"
+                    title="Move up"
+                  >▲</button>
+                  <button
+                    onClick={() => moveTeam(idx, 1)}
+                    disabled={idx === sortedTeams.length - 1}
+                    className="text-gray-500 hover:text-white disabled:opacity-20 leading-none px-0.5"
+                    title="Move down"
+                  >▼</button>
+                </div>
+              </div>
+
+              {/* Team name / rename */}
               {editingId === team.team_id ? (
                 <>
                   <input autoFocus value={editValue}
@@ -755,7 +1003,7 @@ function Step2Teams({ onNext, onBack }: { onNext: () => void; onBack: () => void
                 </>
               )}
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 pl-10">
               {team.players.map((p) => (
                 <span key={p.player_id} className="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full">
                   {p.display_name}
@@ -784,7 +1032,7 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const [fixtures, setFixtures] = useState<Fixture[]>([])
   const [season, setSeason] = useState<Season | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   // New fixture form
   const [homeTeamId, setHomeTeamId] = useState('')
@@ -796,47 +1044,99 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const [submitting, setSubmitting] = useState(false)
   const [lastCreated, setLastCreated] = useState('')
 
-  // Public holidays (persisted in localStorage keyed by season)
-  const [holidays, setHolidays] = useState<string[]>([])
-  const [newHoliday, setNewHoliday] = useState('')
+  // Public holiday ranges (persisted in localStorage keyed by season)
+  const [holidays, setHolidays] = useState<HolidayRange[]>([])
+  const [holidayForm, setHolidayForm] = useState({ start: '', end: '', name: '' })
 
   // Auto-schedule
   const [scheduling, setScheduling] = useState(false)
   const [schedProgress, setSchedProgress] = useState<{ n: number; total: number } | null>(null)
   const [schedError, setSchedError] = useState('')
 
+  // Adjust mode
+  const [adjustMode, setAdjustMode] = useState(false)
+  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState('')
+
   const formRef = useRef<HTMLDivElement>(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
-    const [tr, fr, sr] = await Promise.all([
-      fetch('/api/admin/teams'),
-      fetch('/api/admin/fixtures'),
-      fetch('/api/admin/season'),
-    ])
-    const [teamsData, fixturesData, seasonData]: [Team[], Fixture[], Season] = await Promise.all([
-      tr.json(), fr.json(), sr.json(),
-    ])
-    setTeams(teamsData)
-    setFixtures(fixturesData)
-    setSeason(seasonData)
-    if (teamsData.length >= 2) {
-      setHomeTeamId((prev) => prev || teamsData[0].team_id)
-      setAwayTeamId((prev) => prev || teamsData[1].team_id)
-    }
-    if (fixturesData.length > 0) {
-      setMatchweek(Math.max(...fixturesData.map((f) => f.matchweek)) + 1)
+    setLoadError('')
+    try {
+      const [tr, fr, sr] = await Promise.all([
+        fetch('/api/admin/teams'),
+        fetch('/api/admin/fixtures'),
+        fetch('/api/admin/season'),
+      ])
+      if (!tr.ok || !fr.ok || !sr.ok) {
+        const failed = [
+          !tr.ok && 'teams',
+          !fr.ok && 'fixtures',
+          !sr.ok && 'season',
+        ].filter(Boolean).join(', ')
+        setLoadError(`Failed to load ${failed} — check DB connection and try again.`)
+        setLoading(false)
+        return
+      }
+      const [teamsData, fixturesData, seasonData]: [Team[], Fixture[], Season] = await Promise.all([
+        tr.json(), fr.json(), sr.json(),
+      ])
+      // Apply draft order saved in Step 2
+      try {
+        const stored = localStorage.getItem(TEAM_ORDER_KEY(seasonData.season_id))
+        if (stored) {
+          const order: string[] = JSON.parse(stored)
+          teamsData.sort((a, b) => {
+            const ai = order.indexOf(a.team_id)
+            const bi = order.indexOf(b.team_id)
+            if (ai === -1) return 1
+            if (bi === -1) return -1
+            return ai - bi
+          })
+        }
+      } catch { /* ignore */ }
+      setTeams(teamsData)
+      setFixtures(fixturesData)
+      setSeason(seasonData)
+      if (teamsData.length >= 2) {
+        setHomeTeamId((prev) => prev || teamsData[0].team_id)
+        setAwayTeamId((prev) => prev || teamsData[1].team_id)
+      }
+      if (fixturesData.length > 0) {
+        setMatchweek(Math.max(...fixturesData.map((f) => f.matchweek)) + 1)
+      }
+    } catch (err) {
+      setLoadError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     }
     setLoading(false)
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  // Load/save holidays from localStorage, keyed by season_id once it's known
+  // Load/save holiday ranges from localStorage, keyed by season_id
   useEffect(() => {
     if (!season?.season_id) return
-    const stored = localStorage.getItem(`ufa_holidays_${season.season_id}`)
-    if (stored) setHolidays(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(`ufa_holidays_${season.season_id}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Backward compat: old format was string[]
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+          setHolidays(
+            (parsed as string[]).map((d) => ({
+              id: `legacy-${d}`,
+              start: d,
+              end: d,
+              name: d,
+            }))
+          )
+        } else {
+          setHolidays(parsed as HolidayRange[])
+        }
+      }
+    } catch { /* ignore corrupt localStorage */ }
   }, [season?.season_id])
 
   useEffect(() => {
@@ -845,25 +1145,77 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   }, [holidays, season?.season_id])
 
   function addHoliday() {
-    if (!newHoliday) return
-    setHolidays((prev) => prev.includes(newHoliday) ? prev : [...prev, newHoliday].sort())
-    setNewHoliday('')
+    const { start, end, name } = holidayForm
+    if (!start || !end || !name.trim()) return
+    if (end < start) return // silently ignore invalid range
+    const newRange: HolidayRange = { id: `${start}-${end}-${Date.now()}`, start, end, name: name.trim() }
+    setHolidays((prev) => [...prev, newRange].sort((a, b) => a.start.localeCompare(b.start)))
+    setHolidayForm({ start: '', end: '', name: '' })
   }
 
-  function removeHoliday(date: string) {
-    setHolidays((prev) => prev.filter((d) => d !== date))
+  function removeHoliday(id: string) {
+    setHolidays((prev) => prev.filter((h) => h.id !== id))
   }
 
-  function fmtHoliday(dateStr: string): string {
+  function fmtShortDate(dateStr: string): string {
     const [y, m, d] = dateStr.split('-').map(Number)
     return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
     })
   }
 
-  function preSelectDate(dateStr: string) {
-    setKickoff(`${dateStr}T20:30`)
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  function fmtHolidayRange(h: HolidayRange): string {
+    if (h.start === h.end) return `${h.name} · ${fmtShortDate(h.start)}`
+    return `${h.name} · ${fmtShortDate(h.start)} – ${fmtShortDate(h.end)}`
+  }
+
+  // ── Adjust mode ─────────────────────────────────────────────────────────────
+
+  function toggleAdjustMode() {
+    setAdjustMode((p) => !p)
+    setSelectedFixtureId(null)
+    setMoveError('')
+  }
+
+  function selectFixtureForAdjust(matchId: string) {
+    setSelectedFixtureId((prev) => (prev === matchId ? null : matchId))
+    setMoveError('')
+  }
+
+  async function handleMoveFixture(dateStr: string) {
+    if (!selectedFixtureId) return
+    const f = fixtures.find((fx) => fx.match_id === selectedFixtureId)
+    if (!f) return
+    setMoving(true)
+    setMoveError('')
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const res = await fetch(`/api/admin/fixtures/${selectedFixtureId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        home_team_id: f.home_team_id,
+        away_team_id: f.away_team_id,
+        kickoff_time: makeMVTKickoff(y, m, d),
+        venue: f.venue,
+        matchweek: f.matchweek,
+      }),
+    })
+    setMoving(false)
+    if (!res.ok) { setMoveError('Failed to move fixture'); return }
+    const updated: Fixture[] = await fetch('/api/admin/fixtures').then((r) => r.json())
+    setFixtures(updated)
+    setSelectedFixtureId(null)
+  }
+
+  // ── Calendar date click — routes to form pre-fill or fixture move ────────────
+
+  function handleCalendarDateClick(dateStr: string) {
+    if (adjustMode && selectedFixtureId) {
+      handleMoveFixture(dateStr)
+    } else {
+      setKickoff(`${dateStr}T20:30`)
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    }
   }
 
   function preSelectPairing(homeTeam: Team, awayTeam: Team) {
@@ -872,7 +1224,7 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setFormError('')
     if (homeTeamId === awayTeamId) { setFormError('Home and away teams must be different'); return }
@@ -910,9 +1262,6 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
     const gameDays = getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end, holidays)
     const rounds = generateSchedule(teams)
 
-    // With 5 teams, every pair of consecutive rounds shares ≥3 players,
-    // so a rest day must be skipped between each round.
-    // n rounds require game day indices 0, 2, 4, … 2*(n-1) → need 2n-1 total slots.
     const slotsNeeded = rounds.length * 2 - 1
     if (gameDays.length < slotsNeeded) {
       setSchedError(`Not enough game days: need ${slotsNeeded} Tue/Fri slots (1 rest between each matchweek), found ${gameDays.length}.`)
@@ -929,13 +1278,11 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
     setSchedError('')
     setSchedProgress({ n: 0, total })
 
-    // Clear existing
     const delRes = await fetch('/api/admin/fixtures', { method: 'DELETE' })
     if (!delRes.ok) { setSchedError('Failed to clear fixtures'); setScheduling(false); return }
 
     let n = 0
     for (let i = 0; i < rounds.length; i++) {
-      // Skip every other game day so no team plays on back-to-back game days
       const gd = gameDays[i * 2]
       const mw = i + 1
       for (const [home, away] of rounds[i]) {
@@ -965,14 +1312,23 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
   }
 
   if (loading) return <p className="text-gray-400">Loading…</p>
+  if (loadError) return (
+    <div className="space-y-3">
+      <p className="text-red-400 text-sm">{loadError}</p>
+      <button onClick={loadAll} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium">
+        Retry
+      </button>
+    </div>
+  )
 
   const gameDayCount = season?.start_date && season?.end_date
     ? getSeasonGameDays(season.start_date, season.end_date, season.break_start, season.break_end, holidays).length
     : 0
   const numRounds = teams.length > 0 ? generateSchedule(teams).length : 0
-  // Each round needs 1 game day + 1 rest day (except last round); 10 rounds → 19 slots
   const slotsNeeded = numRounds > 0 ? numRounds * 2 - 1 : 0
-  const totalFixtures = numRounds * 2 // 2 games per round
+  const totalFixtures = numRounds * 2
+
+  const selectedFixture = selectedFixtureId ? fixtures.find((f) => f.match_id === selectedFixtureId) ?? null : null
 
   return (
     <div className="max-w-5xl">
@@ -1005,32 +1361,60 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
       </div>
       {schedError && <p className="text-red-400 text-sm mb-4">{schedError}</p>}
 
-      {/* Public holidays */}
+      {/* Public holiday ranges */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6">
-        <p className="text-xs font-semibold text-gray-400 mb-2">
-          Public Holidays <span className="text-gray-600 font-normal">(excluded from scheduling and shown in orange on the calendar)</span>
+        <p className="text-xs font-semibold text-gray-400 mb-3">
+          Public Holidays{' '}
+          <span className="text-gray-600 font-normal">(excluded from scheduling, shown in orange on calendar)</span>
         </p>
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            type="date"
-            value={newHoliday}
-            onChange={(e) => setNewHoliday(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
-          />
+        {/* Add holiday range form */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end mb-3">
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">Start date</label>
+            <input
+              type="date"
+              value={holidayForm.start}
+              onChange={(e) => setHolidayForm((f) => ({ ...f, start: e.target.value }))}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">End date</label>
+            <input
+              type="date"
+              value={holidayForm.end}
+              min={holidayForm.start || undefined}
+              onChange={(e) => setHolidayForm((f) => ({ ...f, end: e.target.value }))}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">Name</label>
+            <input
+              type="text"
+              placeholder="e.g. Eid al-Fitr"
+              value={holidayForm.name}
+              onChange={(e) => setHolidayForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-600"
+            />
+          </div>
           <button
             onClick={addHoliday}
-            disabled={!newHoliday}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 rounded text-sm"
+            disabled={!holidayForm.start || !holidayForm.end || !holidayForm.name.trim() || holidayForm.end < holidayForm.start}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 rounded text-sm h-[30px]"
           >
             Add
           </button>
         </div>
         {holidays.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {holidays.map((d) => (
-              <span key={d} className="flex items-center gap-1 bg-orange-950 border border-orange-800 text-orange-300 rounded-full px-2.5 py-0.5 text-xs">
-                {fmtHoliday(d)}
-                <button onClick={() => removeHoliday(d)} className="hover:text-white ml-0.5" title="Remove">✕</button>
+            {holidays.map((h) => (
+              <span
+                key={h.id}
+                className="flex items-center gap-1 bg-orange-950 border border-orange-800 text-orange-300 rounded-full px-2.5 py-0.5 text-xs"
+              >
+                {fmtHolidayRange(h)}
+                <button onClick={() => removeHoliday(h.id)} className="hover:text-white ml-0.5" title="Remove">✕</button>
               </span>
             ))}
           </div>
@@ -1055,10 +1439,23 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
         {/* Calendar */}
         <div className="bg-gray-900 rounded-lg p-4">
           <p className="text-xs font-semibold text-gray-400 mb-3">
-            Calendar — click a Tue/Fri to set that date in the form
+            {adjustMode && selectedFixture
+              ? 'Calendar — green dates are valid move targets'
+              : 'Calendar — click a Tue/Fri to set that date in the form'}
           </p>
+          {moving && <p className="text-amber-400 text-xs mb-2">Moving fixture…</p>}
+          {moveError && <p className="text-red-400 text-xs mb-2">{moveError}</p>}
           {season?.start_date && season?.end_date
-            ? <CalendarView season={season} fixtures={fixtures} holidays={holidays} onDateClick={preSelectDate} />
+            ? (
+              <CalendarView
+                season={season}
+                fixtures={fixtures}
+                holidays={holidays}
+                onDateClick={handleCalendarDateClick}
+                adjustMode={adjustMode}
+                selectedFixture={selectedFixture}
+              />
+            )
             : <p className="text-gray-600 text-sm">Set season dates in Step 1 to see the calendar.</p>
           }
         </div>
@@ -1112,9 +1509,29 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
 
       {/* Fixture list */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6">
-        <p className="text-xs font-semibold text-gray-400 mb-3">
-          Scheduled Fixtures ({fixtures.length})
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-400">
+            Scheduled Fixtures ({fixtures.length})
+          </p>
+          <button
+            onClick={toggleAdjustMode}
+            className={[
+              'px-3 py-1 text-xs rounded font-medium transition-colors',
+              adjustMode
+                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300',
+            ].join(' ')}
+          >
+            {adjustMode ? 'Exit Adjust Mode' : 'Adjust Mode'}
+          </button>
+        </div>
+        {adjustMode && (
+          <p className="text-xs text-amber-400 mb-3">
+            {selectedFixture
+              ? `Selected: ${selectedFixture.home_team_name} vs ${selectedFixture.away_team_name} — click a green date on the calendar to move it, or click the fixture again to deselect.`
+              : 'Click a fixture to select it, then click a valid (green) date on the calendar to move it.'}
+          </p>
+        )}
         <FixtureList
           fixtures={fixtures}
           teams={teams}
@@ -1122,6 +1539,9 @@ function Step3Fixtures({ onNext, onBack }: { onNext: () => void; onBack: () => v
             setFixtures((prev) => prev.map((f) => (f.match_id === updated.match_id ? updated : f)))
           }
           onFixtureDeleted={(id) => setFixtures((prev) => prev.filter((f) => f.match_id !== id))}
+          adjustMode={adjustMode}
+          selectedFixtureId={selectedFixtureId}
+          onFixtureSelect={selectFixtureForAdjust}
         />
       </div>
 
