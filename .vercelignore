@@ -1,2 +1,5 @@
 # Planning and documentation
 docs/
+
+#Environmental 
+.env.local
