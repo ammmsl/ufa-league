@@ -64,6 +64,13 @@ export default async function AdminDashboard() {
           <p className="font-semibold">Setup Wizard</p>
           <p className="text-sm text-gray-400 mt-0.5">Configure season, rename teams, create fixtures, go live</p>
         </Link>
+        <Link
+          href="/admin/results"
+          className="block p-4 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <p className="font-semibold">Result Entry</p>
+          <p className="text-sm text-gray-400 mt-0.5">Record match scores, player stats, MVP, and spirit nominations</p>
+        </Link>
       </div>
     </div>
   )
