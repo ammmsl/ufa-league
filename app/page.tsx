@@ -15,7 +15,7 @@ async function getActiveSeason() {
   return rows[0] ?? null
 }
 
-async function getNextFixture(seasonId: string) {
+async function getNextFixtures(seasonId: string) {
   const rows = await sql`
     SELECT
       f.match_id::text,
@@ -30,9 +30,9 @@ async function getNextFixture(seasonId: string) {
       AND f.status = 'scheduled'
       AND f.kickoff_time > NOW()
     ORDER BY f.kickoff_time ASC
-    LIMIT 1
+    LIMIT 3
   `
-  return rows[0] ?? null
+  return rows
 }
 
 async function getLastResult(seasonId: string) {
@@ -87,9 +87,9 @@ export default async function HomePage() {
     )
   }
 
-  const [standings, nextFixture, lastResult] = await Promise.all([
+  const [standings, nextFixtures, lastResult] = await Promise.all([
     getStandings(season.season_id as string),
-    getNextFixture(season.season_id as string),
+    getNextFixtures(season.season_id as string),
     getLastResult(season.season_id as string),
   ])
 
@@ -107,27 +107,34 @@ export default async function HomePage() {
           </span>
         </div>
 
-        {/* Next match */}
-        {nextFixture && (
+        {/* Upcoming matches */}
+        {nextFixtures.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Next Match</h2>
-            <Link
-              href={`/match/${nextFixture.match_id as string}`}
-              className="block bg-gray-900 rounded-xl p-4 hover:bg-gray-800 transition-colors"
-            >
-              <p className="text-xs text-gray-400 mb-2">
-                Matchweek {Number(nextFixture.matchweek)} · {fmtKickoff(nextFixture.kickoff_time as string)}
-              </p>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-semibold text-sm flex-1">
-                  {nextFixture.home_team_name as string}
-                </span>
-                <span className="text-gray-500 text-xs">vs</span>
-                <span className="text-white font-semibold text-sm flex-1 text-right">
-                  {nextFixture.away_team_name as string}
-                </span>
-              </div>
-            </Link>
+            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">
+              {nextFixtures.length === 1 ? 'Next Match' : 'Upcoming'}
+            </h2>
+            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+              {nextFixtures.map((f) => (
+                <Link
+                  key={f.match_id as string}
+                  href={`/match/${f.match_id as string}`}
+                  className="block p-4 hover:bg-gray-800 transition-colors"
+                >
+                  <p className="text-xs text-gray-400 mb-2">
+                    Matchweek {Number(f.matchweek)} · {fmtKickoff(f.kickoff_time as string)}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-semibold text-sm flex-1">
+                      {f.home_team_name as string}
+                    </span>
+                    <span className="text-gray-500 text-xs">vs</span>
+                    <span className="text-white font-semibold text-sm flex-1 text-right">
+                      {f.away_team_name as string}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

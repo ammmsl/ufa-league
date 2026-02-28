@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import sql from '@/lib/db'
+import { getStandings } from '@/lib/standings'
 import PublicNav from '../../_components/PublicNav'
 
 export const revalidate = 0
@@ -17,12 +18,48 @@ async function getTeam(teamId: string) {
 
 async function getRoster(teamId: string) {
   const rows = await sql`
-    SELECT player_id::text, display_name
-    FROM players
-    WHERE team_id = ${teamId} AND is_active = true
-    ORDER BY display_name
+    SELECT
+      p.player_id::text,
+      p.display_name,
+      COALESCE(SUM(pms.goals),   0)::int AS goals,
+      COALESCE(SUM(pms.assists), 0)::int AS assists,
+      COALESCE(SUM(pms.blocks),  0)::int AS blocks,
+      COUNT(pms.stat_id)::int            AS appearances
+    FROM players p
+    LEFT JOIN player_match_stats pms ON pms.player_id = p.player_id
+    WHERE p.team_id = ${teamId} AND p.is_active = true
+    GROUP BY p.player_id, p.display_name
+    ORDER BY p.display_name
   `
   return rows
+}
+
+async function getUpcomingFixtures(teamId: string) {
+  const rows = await sql`
+    SELECT
+      f.match_id::text,
+      f.matchweek,
+      f.kickoff_time,
+      ht.team_id::text AS home_team_id,
+      ht.team_name     AS home_team_name,
+      at.team_id::text AS away_team_id,
+      at.team_name     AS away_team_name
+    FROM fixtures f
+    JOIN  teams ht ON ht.team_id = f.home_team_id
+    JOIN  teams at ON at.team_id = f.away_team_id
+    WHERE (f.home_team_id = ${teamId} OR f.away_team_id = ${teamId})
+      AND f.status = 'scheduled'
+      AND f.kickoff_time > NOW()
+    ORDER BY f.kickoff_time ASC
+    LIMIT 2
+  `
+  return rows
+}
+
+function ordinal(n: number) {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 async function getTeamRecord(teamId: string) {
@@ -158,12 +195,16 @@ export default async function TeamPage({
   const team = await getTeam(teamId)
   if (!team) notFound()
 
-  const [roster, record, recent, h2h] = await Promise.all([
+  const [roster, record, recent, upcoming, h2h, standings] = await Promise.all([
     getRoster(teamId),
     getTeamRecord(teamId),
     getRecentFixtures(teamId),
+    getUpcomingFixtures(teamId),
     getHeadToHead(teamId, team.season_id as string),
+    getStandings(team.season_id as string),
   ])
+
+  const leaguePosition = standings.findIndex((s) => s.team_id === teamId) + 1
 
   const won    = record ? Number(record.won)    : 0
   const drawn  = record ? Number(record.drawn)  : 0
@@ -180,7 +221,14 @@ export default async function TeamPage({
 
         {/* Team header */}
         <div className="bg-gray-900 rounded-xl p-5">
-          <h1 className="text-2xl font-bold mb-3">{team.team_name as string}</h1>
+          <div className="flex items-start justify-between mb-3">
+            <h1 className="text-2xl font-bold">{team.team_name as string}</h1>
+            {leaguePosition > 0 && (
+              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-full shrink-0 ml-3 mt-1">
+                {ordinal(leaguePosition)}
+              </span>
+            )}
+          </div>
           {played > 0 ? (
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
@@ -205,22 +253,38 @@ export default async function TeamPage({
           )}
         </div>
 
-        {/* Roster */}
+        {/* Roster with season stats */}
         <div>
           <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">
             Roster ({roster.length})
           </h2>
-          <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
-            {roster.map((p) => (
-              <Link
-                key={p.player_id as string}
-                href={`/player/${p.player_id as string}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors"
-              >
-                <span className="text-sm">{p.display_name as string}</span>
-                <span className="text-gray-600">›</span>
-              </Link>
-            ))}
+          <div className="bg-gray-900 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-500 text-xs border-b border-gray-800">
+                  <th className="text-left py-2 px-4 font-normal">Player</th>
+                  <th className="text-right py-2 px-2 font-normal">G</th>
+                  <th className="text-right py-2 px-2 font-normal">A</th>
+                  <th className="text-right py-2 px-2 font-normal">B</th>
+                  <th className="text-right py-2 px-4 font-normal"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((p) => (
+                  <tr key={p.player_id as string} className="border-b border-gray-800 last:border-0 hover:bg-gray-800 transition-colors">
+                    <td className="py-2.5 px-4">
+                      <Link href={`/player/${p.player_id as string}`} className="hover:text-green-400 transition-colors">
+                        {p.display_name as string}
+                      </Link>
+                    </td>
+                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.goals)}</td>
+                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.assists)}</td>
+                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.blocks)}</td>
+                    <td className="py-2.5 px-4 text-right text-gray-600">›</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -265,6 +329,35 @@ export default async function TeamPage({
                         MW{Number(f.matchweek)}
                       </span>
                     )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Upcoming fixtures */}
+        {upcoming.length > 0 && (
+          <div>
+            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Upcoming</h2>
+            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+              {upcoming.map((f) => {
+                const isHome   = (f.home_team_id as string) === teamId
+                const opponent = isHome ? (f.away_team_name as string) : (f.home_team_name as string)
+                const oppId    = isHome ? (f.away_team_id as string)   : (f.home_team_id as string)
+                return (
+                  <Link
+                    key={f.match_id as string}
+                    href={`/match/${f.match_id as string}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors"
+                  >
+                    <span className="text-xs text-gray-500 w-16 shrink-0">
+                      {fmtKickoff(f.kickoff_time as string)}
+                    </span>
+                    <span className="text-sm flex-1 truncate">{opponent}</span>
+                    <span className="text-xs text-gray-500 shrink-0">
+                      {isHome ? 'H' : 'A'} · MW{Number(f.matchweek)}
+                    </span>
                   </Link>
                 )
               })}

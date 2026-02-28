@@ -125,13 +125,30 @@ export async function generateMetadata({
       ? `${match.home_team_name as string} ${Number(match.score_home)} – ${Number(match.score_away)} ${match.away_team_name as string} · Matchweek ${Number(match.matchweek)}`
       : `Matchweek ${Number(match.matchweek)} · ${match.home_team_name as string} vs ${match.away_team_name as string}`
 
+  const ogParams = new URLSearchParams({
+    home: match.home_team_name as string,
+    away: match.away_team_name as string,
+    mw:   String(Number(match.matchweek)),
+  })
+  if (match.score_home != null) {
+    ogParams.set('sh', String(Number(match.score_home)))
+    ogParams.set('sa', String(Number(match.score_away)))
+  }
+
   return {
     title,
     description,
     openGraph: {
       title,
       description,
-      type: 'website',
+      type:   'website',
+      images: [`/api/og?${ogParams.toString()}`],
+    },
+    twitter: {
+      card:        'summary_large_image',
+      title,
+      description,
+      images:      [`/api/og?${ogParams.toString()}`],
     },
   }
 }
@@ -164,6 +181,14 @@ export default async function MatchPage({
     const homeWon      = Number(match.score_home) > Number(match.score_away)
     const awayWon      = Number(match.score_away) > Number(match.score_home)
 
+    // Compute top scorer and top assister for TOP STATS block
+    const topScorer = stats.length > 0
+      ? stats.reduce((best, s) => Number(s.goals) >= Number(best.goals) ? s : best)
+      : null
+    const topAssister = stats.length > 0
+      ? stats.reduce((best, s) => Number(s.assists) >= Number(best.assists) ? s : best)
+      : null
+
     const publicContent = (
       <>
         <p className="text-xs text-gray-400 text-center mb-0.5">
@@ -186,8 +211,8 @@ export default async function MatchPage({
         )}
 
         {/* Score card */}
-        <div className="bg-gray-900 rounded-xl p-6 text-center mb-6">
-          <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="bg-gray-900 rounded-xl p-6 text-center mb-4">
+          <div className="flex items-center justify-between gap-2">
             <Link
               href={`/team/${match.home_team_id as string}`}
               className={`text-base font-bold flex-1 text-left leading-tight hover:text-green-400 transition-colors ${homeWon ? 'text-white' : 'text-gray-400'}`}
@@ -204,18 +229,75 @@ export default async function MatchPage({
               {match.away_team_name as string}
             </Link>
           </div>
-          {match.mvp_name && (
-            <p className="text-sm text-gray-400 mt-2">
-              MVP:{' '}
-              <Link
-                href={`/player/${match.mvp_id as string}`}
-                className="text-green-400 hover:text-green-300 font-medium transition-colors"
-              >
-                {match.mvp_name as string}
-              </Link>
-            </p>
-          )}
         </div>
+
+        {/* TOP STATS */}
+        {(
+          (topScorer   && Number(topScorer.goals)   > 0) ||
+          (topAssister && Number(topAssister.assists) > 0) ||
+          match.mvp_name ||
+          nominations.length > 0
+        ) && (
+          <div className="bg-gray-900 rounded-xl p-4 mb-4">
+            <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3">Top Stats</h3>
+            <div className="space-y-2.5">
+              {topScorer && Number(topScorer.goals) > 0 && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-center shrink-0">⚽</span>
+                  <span className="text-gray-400 w-24 shrink-0 text-xs">Top Scorer</span>
+                  <Link
+                    href={`/player/${topScorer.player_id as string}`}
+                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                  >
+                    {topScorer.display_name as string}
+                  </Link>
+                  <span className="text-gray-500 tabular-nums text-xs shrink-0">
+                    {Number(topScorer.goals)} goal{Number(topScorer.goals) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+              {topAssister && Number(topAssister.assists) > 0 && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-center shrink-0">🎯</span>
+                  <span className="text-gray-400 w-24 shrink-0 text-xs">Top Assister</span>
+                  <Link
+                    href={`/player/${topAssister.player_id as string}`}
+                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                  >
+                    {topAssister.display_name as string}
+                  </Link>
+                  <span className="text-gray-500 tabular-nums text-xs shrink-0">
+                    {Number(topAssister.assists)} assist{Number(topAssister.assists) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+              {match.mvp_name && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-center shrink-0">🏆</span>
+                  <span className="text-gray-400 w-24 shrink-0 text-xs">Match MVP</span>
+                  <Link
+                    href={`/player/${match.mvp_id as string}`}
+                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                  >
+                    {match.mvp_name as string}
+                  </Link>
+                </div>
+              )}
+              {nominations.map((n) => (
+                <div key={n.nominating_team_id as string} className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-center shrink-0">✨</span>
+                  <span className="text-gray-400 w-24 shrink-0 text-xs">Spirit</span>
+                  <Link
+                    href={`/player/${n.nominated_player_id as string}`}
+                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                  >
+                    {n.nominated_player_name as string}
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Per-player stats */}
         {(homeStats.length > 0 || awayStats.length > 0 || homeAbsences.length > 0 || awayAbsences.length > 0) && (
@@ -253,6 +335,7 @@ export default async function MatchPage({
                       <tr key={a.player_id as string} className="border-b border-gray-800 last:border-0">
                         <td className="py-1.5 px-3 text-gray-500 italic" colSpan={4}>
                           {a.display_name as string}
+                          <span className="not-italic text-gray-600 ml-1.5 text-[10px]">Did not play</span>
                         </td>
                       </tr>
                     ))}
@@ -291,6 +374,7 @@ export default async function MatchPage({
                       <tr key={a.player_id as string} className="border-b border-gray-800 last:border-0">
                         <td className="py-1.5 px-3 text-gray-500 italic" colSpan={4}>
                           {a.display_name as string}
+                          <span className="not-italic text-gray-600 ml-1.5 text-[10px]">Did not play</span>
                         </td>
                       </tr>
                     ))}

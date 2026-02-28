@@ -16,6 +16,9 @@ export default function PublicNav() {
         <Link href="/teams" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
           Teams
         </Link>
+        <Link href="/players" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
+          Players
+        </Link>
         <Link href="/spirit" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
           Spirit
         </Link>

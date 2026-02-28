@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import sql from '@/lib/db'
+import { getStandings } from '@/lib/standings'
 import PublicNav from '../../_components/PublicNav'
 
 export const revalidate = 0
@@ -11,13 +12,29 @@ async function getPlayer(playerId: string) {
       p.player_id::text,
       p.display_name,
       p.team_id::text,
-      t.team_name
+      t.team_name,
+      t.season_id::text
     FROM players p
     JOIN teams t ON t.team_id = p.team_id
     WHERE p.player_id = ${playerId}
     LIMIT 1
   `
   return rows[0] ?? null
+}
+
+async function getSpiritNominationsReceived(playerId: string) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM spirit_nominations
+    WHERE nominated_player_id = ${playerId}
+  `
+  return rows[0] ? Number(rows[0].total) : 0
+}
+
+function ordinal(n: number) {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 async function getSeasonTotals(playerId: string) {
@@ -94,10 +111,14 @@ export default async function PlayerPage({
   const player = await getPlayer(playerId)
   if (!player) notFound()
 
-  const [totals, matchLog] = await Promise.all([
+  const [totals, matchLog, spiritTotal, standings] = await Promise.all([
     getSeasonTotals(playerId),
     getMatchLog(playerId, player.team_id as string),
+    getSpiritNominationsReceived(playerId),
+    getStandings(player.season_id as string),
   ])
+
+  const leaguePosition = standings.findIndex((s) => s.team_id === (player.team_id as string)) + 1
 
   const appearances  = totals ? Number(totals.appearances)   : 0
   const totalGoals   = totals ? Number(totals.total_goals)   : 0
@@ -111,13 +132,26 @@ export default async function PlayerPage({
 
         {/* Header */}
         <div className="bg-gray-900 rounded-xl p-5">
-          <h1 className="text-2xl font-bold">{player.display_name as string}</h1>
-          <Link
-            href={`/team/${player.team_id as string}`}
-            className="text-sm text-green-400 hover:text-green-300 transition-colors mt-1 inline-block"
-          >
-            {player.team_name as string}
-          </Link>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">{player.display_name as string}</h1>
+              <Link
+                href={`/team/${player.team_id as string}`}
+                className="text-sm text-green-400 hover:text-green-300 transition-colors mt-1 inline-block"
+              >
+                {player.team_name as string}
+                {leaguePosition > 0 && (
+                  <span className="text-gray-500 ml-1">· {ordinal(leaguePosition)}</span>
+                )}
+              </Link>
+            </div>
+            {spiritTotal > 0 && (
+              <div className="text-center shrink-0 ml-4">
+                <p className="text-xl font-bold text-green-400">{spiritTotal}</p>
+                <p className="text-xs text-gray-400 mt-0.5">✨ Spirit</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Season totals */}

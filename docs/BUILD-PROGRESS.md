@@ -1,6 +1,6 @@
 # UFA League Tracker — Build Progress
 
-**Last updated:** 2026-02-28 (Improvement Plan Phase 5 complete)
+**Last updated:** 2026-03-01 (Spec gap fixes in progress)
 **Branch:** `phase-5`
 **Stack:** Next.js 16.1.6 · React 19 · Tailwind CSS v4 · Supabase (plain Postgres) · Vercel
 
@@ -447,6 +447,65 @@ Local development is now working. Key findings recorded here for future referenc
 
 ---
 
+## Spec Gap Fixes (2026-03-01)
+
+Gaps identified vs Technical Specification v1.1 and being fixed sequentially.
+
+| # | Gap | File | Status |
+|---|---|---|---|
+| 1 | TOP STATS block on match page (top scorer, assister, MVP, spirit) | `app/match/[matchId]/page.tsx` | ✅ Done |
+| 2 | Absent players "Did not play" label | `app/match/[matchId]/page.tsx` | ✅ Done |
+| 3 | Team page: league position | `app/team/[teamId]/page.tsx` | ✅ Done |
+| 4 | Team page: upcoming fixtures (next 2) | `app/team/[teamId]/page.tsx` | ✅ Done |
+| 5 | Team page: per-player stats in roster | `app/team/[teamId]/page.tsx` | ✅ Done |
+| 6 | Player page: league position | `app/player/[playerId]/page.tsx` | ✅ Done |
+| 7 | Player page: spirit nominations received | `app/player/[playerId]/page.tsx` | ✅ Done |
+| 8 | Home page: show next 2–3 upcoming fixtures | `app/page.tsx` | ✅ Done |
+| 9 | `/players` list page | `app/players/page.tsx` | ✅ Done |
+| 10 | OG image on match page | `app/match/[matchId]/page.tsx` + `app/api/og/route.tsx` | ✅ Done |
+
+### Item 1 — TOP STATS block ✅
+- Added `topScorer` and `topAssister` computed via `stats.reduce()` from already-fetched `player_match_stats` data (no extra SQL query)
+- New `TOP STATS` card inserted between score card and per-player stat tables
+- Shows: ⚽ Top Scorer (name + goal count), 🎯 Top Assister (name + assist count), 🏆 Match MVP (name), ✨ Spirit (one row per nomination)
+- Each row only renders if data exists (topScorer only shown if goals > 0, etc.)
+- MVP removed from score card and moved into TOP STATS block (per spec §9.4 ASCII layout)
+
+### Items 6–7 — Player page: league position + spirit nominations received ✅
+- `getPlayer()` now also selects `t.season_id` so standings can be fetched for that season
+- `getSpiritNominationsReceived(playerId)` — COUNT query on `spirit_nominations WHERE nominated_player_id = $1`
+- `getStandings()` called; team's position derived from `findIndex`; shown inline after team name as "· 2nd"
+- Spirit total shown as a badge in the header top-right (only if > 0) with ✨ icon and green count
+
+### Items 3–5 — Team page: league position, upcoming fixtures, roster stats ✅
+- `getStandings()` imported from `lib/standings.ts`; position = `standings.findIndex(s => s.team_id === teamId) + 1`; shown as ordinal badge ("1st", "2nd") in header top-right
+- New `getUpcomingFixtures(teamId)` — next 2 `scheduled` fixtures with `kickoff_time > NOW()`, shown in "Upcoming" section between Recent Fixtures and H2H
+- `getRoster()` rewritten with LEFT JOIN on `player_match_stats`; roster now displays as a table with G/A/B columns (season totals); unplayed players show 0
+
+### Item 2 — "Did not play" label ✅
+- Absent player rows in per-team stat tables now show a `<span>Did not play</span>` alongside the greyed-out italic name
+- Applied to both home and away stat table absent rows
+
+### Item 8 — Home page: next 2–3 upcoming fixtures ✅
+- `getNextFixture()` renamed to `getNextFixtures()`, LIMIT raised from 1 to 3
+- JSX updated to render a card list divided by `divide-y divide-gray-800`; section heading is "Next Match" when only 1, "Upcoming" when 2 or 3
+
+### Item 9 — `/players` list page ✅
+- New file `app/players/page.tsx` — server component, `revalidate = 0`
+- Queries all active players from active season, ordered by team name then player name
+- Groups into teams using a typed `Record`; renders a section per team with team name (linked to team page) and player list (each linked to player profile)
+- "Players" link added to `PublicNav` between Teams and Spirit
+
+### Item 10 — OG image on match page ✅
+- New `app/api/og/route.tsx` — Edge runtime, uses `ImageResponse` from `next/og` (built-in, no extra package)
+- Accepts query params: `home`, `away`, `mw` (matchweek), `sh`/`sa` (scores for played matches)
+- Renders 1200×630 dark-bg image with: matchweek label, team names (winner white / loser gray), large score or "vs" centred, green subtitle
+- `app/layout.tsx` — added `metadataBase` (resolves to `VERCEL_PROJECT_PRODUCTION_URL` → `VERCEL_URL` → `localhost:3000`)
+- `generateMetadata` in match page — builds OG URL from match data, adds `openGraph.images` and `twitter.card` + `twitter.images`
+- `npx tsc --noEmit` passes with 0 errors
+
+---
+
 ## Phase 6 — Season Lifecycle ⬜
 
 - Season status transitions: `setup → active → break → resuming → complete`
@@ -486,17 +545,19 @@ ufa-league/
 │   │   │   └── teams/
 │   │   │       ├── route.ts              # GET with rosters
 │   │   │       └── [teamId]/route.ts     # PATCH rename
+│   │   ├── og/route.tsx              # GET — Edge runtime OG image (1200×630 PNG)
 │   │   └── health/route.ts               # GET db health check
 │   ├── fixtures/page.tsx             # Public fixture list
-│   ├── match/[matchId]/page.tsx      # Public match summary
-│   ├── player/[playerId]/page.tsx    # Public player profile
+│   ├── match/[matchId]/page.tsx      # Public match summary (OG image wired)
+│   ├── player/[playerId]/page.tsx    # Public player profile (league pos + spirit count)
+│   ├── players/page.tsx              # Public player roster grouped by team
 │   ├── spirit/page.tsx               # Public spirit leaderboard
 │   ├── standings/page.tsx            # Public standings table
-│   ├── team/[teamId]/page.tsx        # Public team page
+│   ├── team/[teamId]/page.tsx        # Public team page (position badge + upcoming + roster stats)
 │   ├── teams/page.tsx                # Public team list
 │   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx                      # Home page
+│   ├── layout.tsx                    # metadataBase set here
+│   └── page.tsx                      # Home page (next 2–3 fixtures)
 ├── lib/
 │   ├── auth.ts          # JWT sign/verify, getAdminSession
 │   ├── db.ts            # Postgres client (max:1, ssl:require, prepare:false)
