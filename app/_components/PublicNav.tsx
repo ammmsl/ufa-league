@@ -19,6 +19,18 @@ export default function PublicNav() {
         <Link href="/spirit" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
           Spirit
         </Link>
+        <Link href="/stats" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
+          Stats
+        </Link>
+        <Link href="/mvp" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
+          MVP
+        </Link>
+        <Link href="/gallery" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
+          Gallery
+        </Link>
+        <Link href="/rules" className="text-gray-400 hover:text-white whitespace-nowrap text-sm shrink-0 transition-colors">
+          Rules
+        </Link>
       </div>
     </nav>
   )

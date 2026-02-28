@@ -15,9 +15,74 @@ async function getActiveSeason() {
   return rows[0] ?? null
 }
 
+async function getFormGuide(seasonId: string): Promise<Map<string, ('W' | 'D' | 'L')[]>> {
+  const rows = await sql`
+    SELECT
+      team_id::text,
+      result,
+      kickoff_time
+    FROM (
+      SELECT
+        f.home_team_id AS team_id,
+        CASE WHEN mr.score_home > mr.score_away THEN 'W'
+             WHEN mr.score_home = mr.score_away THEN 'D'
+             ELSE 'L' END AS result,
+        f.kickoff_time
+      FROM fixtures f
+      JOIN match_results mr ON mr.match_id = f.match_id
+      WHERE f.season_id = ${seasonId}
+      UNION ALL
+      SELECT
+        f.away_team_id AS team_id,
+        CASE WHEN mr.score_away > mr.score_home THEN 'W'
+             WHEN mr.score_away = mr.score_home THEN 'D'
+             ELSE 'L' END AS result,
+        f.kickoff_time
+      FROM fixtures f
+      JOIN match_results mr ON mr.match_id = f.match_id
+      WHERE f.season_id = ${seasonId}
+    ) sub
+    ORDER BY team_id, kickoff_time DESC
+  `
+
+  const map = new Map<string, ('W' | 'D' | 'L')[]>()
+  for (const row of rows) {
+    const tid = row.team_id as string
+    if (!map.has(tid)) map.set(tid, [])
+    const arr = map.get(tid)!
+    if (arr.length < 5) arr.push(row.result as 'W' | 'D' | 'L')
+  }
+  // Reverse each team's array so oldest is leftmost
+  for (const [tid, arr] of map) {
+    map.set(tid, arr.reverse())
+  }
+  return map
+}
+
+function FormGuide({ form }: { form: ('W' | 'D' | 'L')[] }) {
+  const colours = { W: 'bg-green-500', D: 'bg-gray-500', L: 'bg-red-500' }
+  return (
+    <div className="flex gap-1">
+      {form.map((r, i) => (
+        <span
+          key={i}
+          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${colours[r]}`}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default async function StandingsPage() {
   const season = await getActiveSeason()
-  const standings = season ? await getStandings(season.season_id as string) : []
+  const [standings, formGuide] = season
+    ? await Promise.all([
+        getStandings(season.season_id as string),
+        getFormGuide(season.season_id as string),
+      ])
+    : [[], new Map<string, ('W' | 'D' | 'L')[]>()]
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -41,6 +106,7 @@ export default async function StandingsPage() {
                 <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GF</th>
                 <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GA</th>
                 <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GD</th>
+                <th className="py-3 px-2 font-normal hidden sm:table-cell">Form</th>
                 <th className="text-right py-3 px-4 font-normal">Pts</th>
               </tr>
             </thead>
@@ -71,6 +137,9 @@ export default async function StandingsPage() {
                     >
                       {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
                     </span>
+                  </td>
+                  <td className="py-3 px-2 hidden sm:table-cell">
+                    <FormGuide form={formGuide.get(row.team_id) ?? []} />
                   </td>
                   <td className="py-3 px-4 text-right font-bold text-green-400">{row.points}</td>
                 </tr>

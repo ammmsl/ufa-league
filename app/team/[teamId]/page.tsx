@@ -68,6 +68,53 @@ async function getTeamRecord(teamId: string) {
   return rows[0] ?? null
 }
 
+async function getHeadToHead(teamId: string, seasonId: string) {
+  const rows = await sql`
+    SELECT
+      opp.team_id::text   AS opponent_team_id,
+      opp.team_name       AS opponent_name,
+      COALESCE(h2h.won,   0)::int AS won,
+      COALESCE(h2h.drawn, 0)::int AS drawn,
+      COALESCE(h2h.lost,  0)::int AS lost,
+      COALESCE(h2h.goals_for,     0)::int AS goals_for,
+      COALESCE(h2h.goals_against, 0)::int AS goals_against,
+      h2h.played
+    FROM teams opp
+    LEFT JOIN (
+      SELECT
+        opponent_team_id,
+        SUM(CASE WHEN my_score > opp_score THEN 1 ELSE 0 END)::int AS won,
+        SUM(CASE WHEN my_score = opp_score THEN 1 ELSE 0 END)::int AS drawn,
+        SUM(CASE WHEN my_score < opp_score THEN 1 ELSE 0 END)::int AS lost,
+        SUM(my_score)::int   AS goals_for,
+        SUM(opp_score)::int  AS goals_against,
+        COUNT(*)::int        AS played
+      FROM (
+        SELECT
+          f.away_team_id AS opponent_team_id,
+          mr.score_home  AS my_score,
+          mr.score_away  AS opp_score
+        FROM fixtures f
+        JOIN match_results mr ON mr.match_id = f.match_id
+        WHERE f.home_team_id = ${teamId}
+        UNION ALL
+        SELECT
+          f.home_team_id AS opponent_team_id,
+          mr.score_away  AS my_score,
+          mr.score_home  AS opp_score
+        FROM fixtures f
+        JOIN match_results mr ON mr.match_id = f.match_id
+        WHERE f.away_team_id = ${teamId}
+      ) sub
+      GROUP BY opponent_team_id
+    ) h2h ON h2h.opponent_team_id = opp.team_id
+    WHERE opp.season_id = ${seasonId}
+      AND opp.team_id != ${teamId}
+    ORDER BY opp.team_name ASC
+  `
+  return rows
+}
+
 async function getRecentFixtures(teamId: string) {
   const rows = await sql`
     SELECT
@@ -111,10 +158,11 @@ export default async function TeamPage({
   const team = await getTeam(teamId)
   if (!team) notFound()
 
-  const [roster, record, recent] = await Promise.all([
+  const [roster, record, recent, h2h] = await Promise.all([
     getRoster(teamId),
     getTeamRecord(teamId),
     getRecentFixtures(teamId),
+    getHeadToHead(teamId, team.season_id as string),
   ])
 
   const won    = record ? Number(record.won)    : 0
@@ -218,6 +266,46 @@ export default async function TeamPage({
                       </span>
                     )}
                   </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Head-to-head */}
+        {h2h.length > 0 && (
+          <div>
+            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Head-to-Head</h2>
+            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+              {h2h.map((opp) => {
+                const hasPlayed = opp.played != null && Number(opp.played) > 0
+                return (
+                  <div
+                    key={opp.opponent_team_id as string}
+                    className="flex items-center px-4 py-3 gap-3"
+                  >
+                    <Link
+                      href={`/team/${opp.opponent_team_id as string}`}
+                      className="text-sm flex-1 hover:text-green-400 transition-colors"
+                    >
+                      {opp.opponent_name as string}
+                    </Link>
+                    {hasPlayed ? (
+                      <span className="text-sm tabular-nums text-gray-400 shrink-0">
+                        <span className="text-green-400 font-medium">{Number(opp.won)}W</span>
+                        {' · '}
+                        {Number(opp.drawn)}D
+                        {' · '}
+                        <span className="text-red-400">{Number(opp.lost)}L</span>
+                        {'  '}
+                        <span className="text-gray-500 text-xs ml-1">
+                          {Number(opp.goals_for)}–{Number(opp.goals_against)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-600 shrink-0">—</span>
+                    )}
+                  </div>
                 )
               })}
             </div>

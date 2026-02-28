@@ -75,7 +75,7 @@ export default async function FixturesPage({
 
   const filtered = allFixtures.filter((f) => {
     if (filter === 'upcoming')  return f.status === 'scheduled'
-    if (filter === 'completed') return f.status === 'completed'
+    if (filter === 'completed') return f.status === 'complete'
     return true
   })
 
