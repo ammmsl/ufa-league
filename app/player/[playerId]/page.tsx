@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import sql from '@/lib/db'
 import { getStandings } from '@/lib/standings'
+import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
 
 export const revalidate = 0
@@ -29,12 +30,6 @@ async function getSpiritNominationsReceived(playerId: string) {
     WHERE nominated_player_id = ${playerId}
   `
   return rows[0] ? Number(rows[0].total) : 0
-}
-
-function ordinal(n: number) {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 async function getSeasonTotals(playerId: string) {

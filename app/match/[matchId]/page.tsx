@@ -135,6 +135,8 @@ export async function generateMetadata({
     ogParams.set('sa', String(Number(match.score_away)))
   }
 
+  const ogImage = `/api/og?${ogParams.toString()}`
+
   return {
     title,
     description,
@@ -142,13 +144,13 @@ export async function generateMetadata({
       title,
       description,
       type:   'website',
-      images: [`/api/og?${ogParams.toString()}`],
+      images: [ogImage],
     },
     twitter: {
       card:        'summary_large_image',
       title,
       description,
-      images:      [`/api/og?${ogParams.toString()}`],
+      images:      [ogImage],
     },
   }
 }

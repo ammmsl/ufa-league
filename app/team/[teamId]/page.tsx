@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import sql from '@/lib/db'
 import { getStandings } from '@/lib/standings'
+import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
 
 export const revalidate = 0
@@ -54,12 +55,6 @@ async function getUpcomingFixtures(teamId: string) {
     LIMIT 2
   `
   return rows
-}
-
-function ordinal(n: number) {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 async function getTeamRecord(teamId: string) {
@@ -344,7 +339,6 @@ export default async function TeamPage({
               {upcoming.map((f) => {
                 const isHome   = (f.home_team_id as string) === teamId
                 const opponent = isHome ? (f.away_team_name as string) : (f.home_team_name as string)
-                const oppId    = isHome ? (f.away_team_id as string)   : (f.home_team_id as string)
                 return (
                   <Link
                     key={f.match_id as string}
