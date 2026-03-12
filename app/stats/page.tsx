@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import sql from '@/lib/db'
 import PublicNav from '../_components/PublicNav'
+import StatsClient from './StatsClient'
 
 export const revalidate = 0
 
@@ -14,14 +14,34 @@ async function getActiveSeason() {
   return rows[0] ?? null
 }
 
-type StatRow = {
-  player_id: string
+export type StatRow = {
+  player_id:    string
   display_name: string
-  team_name: string
-  team_id: string
-  appearances: number
-  total: number
-  per_game: number | null
+  team_name:    string
+  team_id:      string
+  appearances:  number
+  total:        number
+  per_game:     number | null
+}
+
+export type MatchweekRow = {
+  player_id:    string
+  display_name: string
+  team_name:    string
+  matchweek:    number
+  cum_goals:    number
+  cum_assists:  number
+  cum_blocks:   number
+  cum_apps:     number
+}
+
+export type StatsClientProps = {
+  seasonName:  string
+  goals:       StatRow[]
+  assists:     StatRow[]
+  blocks:      StatRow[]
+  appearances: StatRow[]
+  history:     MatchweekRow[]
 }
 
 async function getGoals(seasonId: string): Promise<StatRow[]> {
@@ -146,63 +166,47 @@ async function getAppearances(seasonId: string): Promise<StatRow[]> {
   }))
 }
 
-function StatTable({
-  rows,
-  label,
-  showPerGame,
-}: {
-  rows: StatRow[]
-  label: string
-  showPerGame: boolean
-}) {
-  return (
-    <div className="bg-gray-900 rounded-xl overflow-x-auto">
-      <div className="px-4 py-3 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-widest">{label}</h2>
-      </div>
-      <table className="w-full text-sm min-w-[480px]">
-        <thead>
-          <tr className="text-gray-500 text-xs border-b border-gray-800">
-            <th className="text-left py-2 px-4 font-normal w-8">#</th>
-            <th className="text-left py-2 px-2 font-normal">Player</th>
-            <th className="text-left py-2 px-2 font-normal">Team</th>
-            <th className="text-right py-2 px-2 font-normal">Total</th>
-            <th className="text-right py-2 px-2 font-normal">Apps</th>
-            {showPerGame && (
-              <th className="text-right py-2 px-4 font-normal">Per Game</th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={row.player_id} className="border-b border-gray-800 last:border-0">
-              <td className="py-2 px-4 text-gray-500 text-xs">{i + 1}</td>
-              <td className="py-2 px-2">
-                <Link
-                  href={`/player/${row.player_id}`}
-                  className="hover:text-green-400 transition-colors font-medium"
-                >
-                  {row.display_name}
-                </Link>
-              </td>
-              <td className="py-2 px-2 text-gray-400">
-                <Link href={`/team/${row.team_id}`} className="hover:text-white transition-colors">
-                  {row.team_name}
-                </Link>
-              </td>
-              <td className="py-2 px-2 text-right">{row.total}</td>
-              <td className="py-2 px-2 text-right text-gray-400">{row.appearances}</td>
-              {showPerGame && (
-                <td className="py-2 px-4 text-right text-gray-400">
-                  {row.per_game != null ? row.per_game.toFixed(1) : '—'}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+async function getMatchweekHistory(seasonId: string): Promise<MatchweekRow[]> {
+  const rows = await sql`
+    WITH matchweek_totals AS (
+      SELECT
+        pms.player_id::text,
+        p.display_name,
+        t.team_name,
+        f.matchweek,
+        SUM(pms.goals)::int    AS goals,
+        SUM(pms.assists)::int  AS assists,
+        SUM(pms.blocks)::int   AS blocks,
+        COUNT(pms.match_id)::int AS apps
+      FROM player_match_stats pms
+      JOIN players  p ON p.player_id = pms.player_id
+      JOIN teams    t ON t.team_id   = p.team_id
+      JOIN fixtures f ON f.match_id  = pms.match_id
+      WHERE t.season_id = ${seasonId}
+      GROUP BY pms.player_id, p.display_name, t.team_name, f.matchweek
+    )
+    SELECT
+      player_id,
+      display_name,
+      team_name,
+      matchweek,
+      SUM(goals)   OVER (PARTITION BY player_id ORDER BY matchweek)::int AS cum_goals,
+      SUM(assists) OVER (PARTITION BY player_id ORDER BY matchweek)::int AS cum_assists,
+      SUM(blocks)  OVER (PARTITION BY player_id ORDER BY matchweek)::int AS cum_blocks,
+      SUM(apps)    OVER (PARTITION BY player_id ORDER BY matchweek)::int AS cum_apps
+    FROM matchweek_totals
+    ORDER BY player_id, matchweek
+  `
+  return rows.map((r) => ({
+    player_id:    String(r.player_id),
+    display_name: String(r.display_name),
+    team_name:    String(r.team_name),
+    matchweek:    Number(r.matchweek),
+    cum_goals:    Number(r.cum_goals),
+    cum_assists:  Number(r.cum_assists),
+    cum_blocks:   Number(r.cum_blocks),
+    cum_apps:     Number(r.cum_apps),
+  }))
 }
 
 export default async function StatsPage() {
@@ -220,27 +224,27 @@ export default async function StatsPage() {
     )
   }
 
-  const [goals, assists, blocks, appearances] = await Promise.all([
-    getGoals(season.season_id as string),
-    getAssists(season.season_id as string),
-    getBlocks(season.season_id as string),
-    getAppearances(season.season_id as string),
+  const seasonId = season.season_id as string
+
+  const [goals, assists, blocks, appearances, history] = await Promise.all([
+    getGoals(seasonId),
+    getAssists(seasonId),
+    getBlocks(seasonId),
+    getAppearances(seasonId),
+    getMatchweekHistory(seasonId),
   ])
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Stats</h1>
-          <p className="text-gray-400 text-sm">{season.season_name as string}</p>
-        </div>
-
-        <StatTable rows={goals}       label="Goals"       showPerGame={true} />
-        <StatTable rows={assists}     label="Assists"     showPerGame={true} />
-        <StatTable rows={blocks}      label="Blocks"      showPerGame={true} />
-        <StatTable rows={appearances} label="Appearances" showPerGame={false} />
-      </div>
+      <StatsClient
+        seasonName={season.season_name as string}
+        goals={goals}
+        assists={assists}
+        blocks={blocks}
+        appearances={appearances}
+        history={history}
+      />
     </div>
   )
 }

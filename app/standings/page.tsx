@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import sql from '@/lib/db'
-import { getStandings } from '@/lib/standings'
+import { getStandings, getHistoricalStandings } from '@/lib/standings'
 import PublicNav from '../_components/PublicNav'
+import StandingsChart from './StandingsChart'
 
 export const revalidate = 0
 
@@ -52,7 +53,6 @@ async function getFormGuide(seasonId: string): Promise<Map<string, ('W' | 'D' | 
     const arr = map.get(tid)!
     if (arr.length < 5) arr.push(row.result as 'W' | 'D' | 'L')
   }
-  // Reverse each team's array so oldest is leftmost
   for (const [tid, arr] of map) {
     map.set(tid, arr.reverse())
   }
@@ -77,80 +77,92 @@ function FormGuide({ form }: { form: ('W' | 'D' | 'L')[] }) {
 
 export default async function StandingsPage() {
   const season = await getActiveSeason()
-  const [standings, formGuide] = season
+  const [standings, formGuide, historicalData] = season
     ? await Promise.all([
         getStandings(season.season_id as string),
         getFormGuide(season.season_id as string),
+        getHistoricalStandings(season.season_id as string),
       ])
-    : [[], new Map<string, ('W' | 'D' | 'L')[]>()]
+    : [[], new Map<string, ('W' | 'D' | 'L')[]>(), []]
+
+  const teamOrder = standings.map((row) => row.team_id)
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
+      <div className="max-w-4xl mx-auto px-4 pb-16 pt-6">
         <h1 className="text-2xl font-bold mb-1">Standings</h1>
         {season && (
           <p className="text-gray-400 text-sm mb-6">{season.season_name as string}</p>
         )}
 
-        <div className="bg-gray-900 rounded-xl overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-500 text-xs border-b border-gray-800">
-                <th className="text-left py-3 px-4 font-normal w-6">#</th>
-                <th className="text-left py-3 px-4 font-normal">Team</th>
-                <th className="text-right py-3 px-2 font-normal">P</th>
-                <th className="text-right py-3 px-2 font-normal">W</th>
-                <th className="text-right py-3 px-2 font-normal">D</th>
-                <th className="text-right py-3 px-2 font-normal">L</th>
-                <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GF</th>
-                <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GA</th>
-                <th className="text-right py-3 px-2 font-normal hidden sm:table-cell">GD</th>
-                <th className="py-3 px-2 font-normal hidden sm:table-cell">Form</th>
-                <th className="text-right py-3 px-4 font-normal">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map((row, i) => (
-                <tr key={row.team_id} className="border-b border-gray-800 last:border-0">
-                  <td className="py-3 px-4 text-gray-500 text-xs">{i + 1}</td>
-                  <td className="py-3 px-4 font-medium">
-                    <Link href={`/team/${row.team_id}`} className="hover:text-green-400 transition-colors">
-                      {row.team_name}
-                    </Link>
-                  </td>
-                  <td className="py-3 px-2 text-right text-gray-400">{row.played}</td>
-                  <td className="py-3 px-2 text-right">{row.won}</td>
-                  <td className="py-3 px-2 text-right text-gray-400">{row.drawn}</td>
-                  <td className="py-3 px-2 text-right">{row.lost}</td>
-                  <td className="py-3 px-2 text-right text-gray-400 hidden sm:table-cell">{row.goals_for}</td>
-                  <td className="py-3 px-2 text-right text-gray-400 hidden sm:table-cell">{row.goals_against}</td>
-                  <td className="py-3 px-2 text-right hidden sm:table-cell">
-                    <span
-                      className={
-                        row.goal_diff > 0
-                          ? 'text-green-400'
-                          : row.goal_diff < 0
-                          ? 'text-red-400'
-                          : 'text-gray-400'
-                      }
-                    >
-                      {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
-                    </span>
-                  </td>
-                  <td className="py-3 px-2 hidden sm:table-cell">
-                    <FormGuide form={formGuide.get(row.team_id) ?? []} />
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-green-400">{row.points}</td>
+        <div className="space-y-6">
+          {/* Standings table */}
+          <div className="bg-gray-900 rounded-xl overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-500 text-xs border-b border-gray-800">
+                  <th className="text-left py-3 px-4 font-normal w-6">#</th>
+                  <th className="text-left py-3 px-4 font-normal">Team</th>
+                  <th className="text-right py-3 px-2 font-normal">P</th>
+                  <th className="text-right py-3 px-2 font-normal">W</th>
+                  <th className="text-right py-3 px-2 font-normal">D</th>
+                  <th className="text-right py-3 px-2 font-normal">L</th>
+                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GS</th>
+                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GA</th>
+                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GD</th>
+                  <th className="py-3 px-2 font-normal hidden md:table-cell">Form</th>
+                  <th className="text-right py-3 px-4 font-normal">Pts</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {standings.map((row, i) => (
+                  <tr key={row.team_id} className="border-b border-gray-800 last:border-0">
+                    <td className="py-3 px-4 text-gray-500 text-xs">{i + 1}</td>
+                    <td className="py-3 px-4 font-medium">
+                      <Link href={`/team/${row.team_id}`} className="hover:text-green-400 transition-colors">
+                        {row.team_name}
+                      </Link>
+                    </td>
+                    <td className="py-3 px-2 text-right text-gray-400">{row.played}</td>
+                    <td className="py-3 px-2 text-right">{row.won}</td>
+                    <td className="py-3 px-2 text-right text-gray-400">{row.drawn}</td>
+                    <td className="py-3 px-2 text-right">{row.lost}</td>
+                    <td className="py-3 px-2 text-right text-gray-400 hidden md:table-cell">{row.goals_for}</td>
+                    <td className="py-3 px-2 text-right text-gray-400 hidden md:table-cell">{row.goals_against}</td>
+                    <td className="py-3 px-2 text-right hidden md:table-cell">
+                      <span
+                        className={
+                          row.goal_diff > 0
+                            ? 'text-green-400'
+                            : row.goal_diff < 0
+                            ? 'text-red-400'
+                            : 'text-gray-400'
+                        }
+                      >
+                        {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 hidden md:table-cell">
+                      <FormGuide form={formGuide.get(row.team_id) ?? []} />
+                    </td>
+                    <td className="py-3 px-4 text-right font-bold text-green-400">{row.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <p className="text-xs text-gray-600 mt-4">
-          Tiebreaker order: Goal difference → Head-to-head → Goals scored
-        </p>
+          <p className="text-xs text-gray-600 -mt-2">
+            Tiebreaker order: Goal difference (GD) → Head-to-head → Goals scored (GS)
+          </p>
+
+          {/* Position history chart */}
+          <div className="bg-gray-900 rounded-xl p-4">
+            <h2 className="text-sm font-semibold text-gray-400 mb-4">Position History</h2>
+            <StandingsChart data={historicalData} teamOrder={teamOrder} />
+          </div>
+        </div>
       </div>
     </div>
   )
