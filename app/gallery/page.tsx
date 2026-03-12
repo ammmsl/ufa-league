@@ -5,15 +5,15 @@ import PublicNav from '../_components/PublicNav'
 
 export default function GalleryPage() {
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
       <Script
         src="https://cdn.jsdelivr.net/npm/publicalbum@latest/embed-ui.min.js"
         strategy="lazyOnload"
       />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
-        <h1 className="text-2xl font-bold mb-2">Gallery</h1>
-        <p className="text-gray-400 text-sm mb-6">Season 1 match photos</p>
+      <div className="page-container">
+        <h1 className="page-heading">Gallery</h1>
+        <p className="page-subheading">Season 1 match photos</p>
 
         <div className="rounded-xl overflow-hidden">
           <div
@@ -35,7 +35,7 @@ export default function GalleryPage() {
           href="https://photos.app.goo.gl/6vWZi1mup4mGY5fP8"
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-center text-sm text-blue-400 hover:text-blue-300 mt-2 transition-colors"
+          className="block text-center text-sm link-accent mt-2"
         >
           Open album in Google Photos ↗
         </a>

@@ -47,12 +47,12 @@ export default async function PlayersPage() {
   const teams = Object.entries(teamMap)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-6">
+      <div className="page-container space-y-6">
 
         <div className="flex items-baseline justify-between">
-          <h1 className="text-xl font-bold">Players</h1>
+          <h1 className="page-heading">Players</h1>
           <span className="text-xs text-gray-500">{players.length} total</span>
         </div>
 
@@ -61,13 +61,13 @@ export default async function PlayersPage() {
             <div className="flex items-baseline justify-between mb-2">
               <Link
                 href={`/team/${teamId}`}
-                className="text-xs text-gray-400 uppercase tracking-widest hover:text-green-400 transition-colors"
+                className="text-xs uppercase tracking-widest link-accent"
               >
                 {team_name}
               </Link>
               <span className="text-xs text-gray-600">{teamPlayers.length}</span>
             </div>
-            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+            <div className="card-list divide-y divide-gray-800">
               {teamPlayers.map((p) => (
                 <Link
                   key={p.player_id}
@@ -83,7 +83,7 @@ export default async function PlayersPage() {
         ))}
 
         {players.length === 0 && (
-          <p className="text-gray-400 text-sm">No players found.</p>
+          <div className="empty-state">No players found.</div>
         )}
 
       </div>

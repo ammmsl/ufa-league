@@ -4,6 +4,7 @@ import sql from '@/lib/db'
 import { getStandings } from '@/lib/standings'
 import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
+import StatCard from '../../_components/StatCard'
 
 export const revalidate = 0
 
@@ -210,33 +211,26 @@ export default async function TeamPage({
   const ga     = record ? Number(record.goals_against) : 0
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-6">
+      <div className="page-container space-y-6">
 
         {/* Team header */}
-        <div className="bg-gray-900 rounded-xl p-5">
+        <div className="card-p5">
           <div className="flex items-start justify-between mb-3">
-            <h1 className="text-2xl font-bold">{team.team_name as string}</h1>
+            <h1 className="page-heading">{team.team_name as string}</h1>
             {leaguePosition > 0 && (
-              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-full shrink-0 ml-3 mt-1">
+              <span className="badge badge-meta shrink-0 ml-3 mt-1">
                 {ordinal(leaguePosition)}
               </span>
             )}
           </div>
           {played > 0 ? (
-            <div className="grid grid-cols-4 gap-2 text-center">
-              {[
-                { label: 'Pts', value: pts,   highlight: true },
-                { label: 'W',   value: won,   highlight: false },
-                { label: 'D',   value: drawn, highlight: false },
-                { label: 'L',   value: lost,  highlight: false },
-              ].map(({ label, value, highlight }) => (
-                <div key={label} className="bg-gray-800 rounded-lg py-2">
-                  <p className={`text-xl font-bold ${highlight ? 'text-green-400' : ''}`}>{value}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{label}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-4 gap-2">
+              <StatCard label="Pts" value={pts}   highlight size="sm" />
+              <StatCard label="W"   value={won}   size="sm" />
+              <StatCard label="D"   value={drawn} size="sm" />
+              <StatCard label="L"   value={lost}  size="sm" />
             </div>
           ) : (
             <p className="text-sm text-gray-400">No results yet · {roster.length} players</p>
@@ -250,32 +244,30 @@ export default async function TeamPage({
 
         {/* Roster with season stats */}
         <div>
-          <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">
-            Roster ({roster.length})
-          </h2>
-          <div className="bg-gray-900 rounded-xl overflow-hidden">
+          <h2 className="section-label">Roster ({roster.length})</h2>
+          <div className="card-list">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-gray-500 text-xs border-b border-gray-800">
-                  <th className="text-left py-2 px-4 font-normal">Player</th>
-                  <th className="text-right py-2 px-2 font-normal">G</th>
-                  <th className="text-right py-2 px-2 font-normal">A</th>
-                  <th className="text-right py-2 px-2 font-normal">B</th>
-                  <th className="text-right py-2 px-4 font-normal"></th>
+                <tr className="border-b border-gray-800">
+                  <th className="table-th table-th-l text-left">Player</th>
+                  <th className="table-th table-th-sm text-right">G</th>
+                  <th className="table-th table-th-sm text-right">A</th>
+                  <th className="table-th table-th-sm text-right">B</th>
+                  <th className="table-th table-th-r text-right"></th>
                 </tr>
               </thead>
               <tbody>
                 {roster.map((p) => (
-                  <tr key={p.player_id as string} className="border-b border-gray-800 last:border-0 hover:bg-gray-800 transition-colors">
-                    <td className="py-2.5 px-4">
-                      <Link href={`/player/${p.player_id as string}`} className="hover:text-green-400 transition-colors">
+                  <tr key={p.player_id as string} className="table-row-hover">
+                    <td className="table-td table-td-l">
+                      <Link href={`/player/${p.player_id as string}`} className="link-accent">
                         {p.display_name as string}
                       </Link>
                     </td>
-                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.goals)}</td>
-                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.assists)}</td>
-                    <td className="py-2.5 px-2 text-right tabular-nums text-gray-400">{Number(p.blocks)}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-600">›</td>
+                    <td className="table-td table-td-sm text-right tabular-nums text-gray-400">{Number(p.goals)}</td>
+                    <td className="table-td table-td-sm text-right tabular-nums text-gray-400">{Number(p.assists)}</td>
+                    <td className="table-td table-td-sm text-right tabular-nums text-gray-400">{Number(p.blocks)}</td>
+                    <td className="table-td table-td-r text-right text-gray-600">›</td>
                   </tr>
                 ))}
               </tbody>
@@ -286,8 +278,8 @@ export default async function TeamPage({
         {/* Recent fixtures */}
         {recent.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Recent Fixtures</h2>
-            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+            <h2 className="section-label">Recent Fixtures</h2>
+            <div className="card-list divide-y divide-gray-800">
               {recent.map((f) => {
                 const isHome   = (f.home_team_id as string) === teamId
                 const opponent = isHome
@@ -306,12 +298,12 @@ export default async function TeamPage({
                   <Link
                     key={f.match_id as string}
                     href={`/match/${f.match_id as string}`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors text-sm"
                   >
                     <span className="text-xs text-gray-500 w-16 shrink-0">
                       {fmtKickoff(f.kickoff_time as string)}
                     </span>
-                    <span className="text-sm flex-1 truncate">{opponent}</span>
+                    <span className="flex-1 truncate">{opponent}</span>
                     {played && result ? (
                       <span className={`text-sm font-bold tabular-nums shrink-0 ${result.cls}`}>
                         {result.label}&nbsp;
@@ -334,8 +326,8 @@ export default async function TeamPage({
         {/* Upcoming fixtures */}
         {upcoming.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Upcoming</h2>
-            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+            <h2 className="section-label">Upcoming</h2>
+            <div className="card-list divide-y divide-gray-800">
               {upcoming.map((f) => {
                 const isHome   = (f.home_team_id as string) === teamId
                 const opponent = isHome ? (f.away_team_name as string) : (f.home_team_name as string)
@@ -343,7 +335,7 @@ export default async function TeamPage({
                   <Link
                     key={f.match_id as string}
                     href={`/match/${f.match_id as string}`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors text-sm"
                   >
                     <span className="text-xs text-gray-500 w-16 shrink-0">
                       {fmtKickoff(f.kickoff_time as string)}
@@ -362,8 +354,8 @@ export default async function TeamPage({
         {/* Head-to-head */}
         {h2h.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Head-to-Head</h2>
-            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+            <h2 className="section-label">Head-to-Head</h2>
+            <div className="card-list divide-y divide-gray-800">
               {h2h.map((opp) => {
                 const hasPlayed = opp.played != null && Number(opp.played) > 0
                 return (
@@ -373,7 +365,7 @@ export default async function TeamPage({
                   >
                     <Link
                       href={`/team/${opp.opponent_team_id as string}`}
-                      className="text-sm flex-1 hover:text-green-400 transition-colors"
+                      className="text-sm flex-1 link-accent"
                     >
                       {opp.opponent_name as string}
                     </Link>

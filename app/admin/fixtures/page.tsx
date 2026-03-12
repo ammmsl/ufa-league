@@ -465,11 +465,11 @@ export default function FixturesPage() {
     cascadeRows.every((row) => row.flag !== 'conflict' && row.flag !== 'out-of-bounds')
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <AdminNav />
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-1">Fixture Wizard</h1>
-        <p className="text-gray-400 text-sm mb-6">
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-16">
+        <h1 className="page-heading">Fixture Wizard</h1>
+        <p className="page-subheading">
           Postpone a match and cascade-reschedule all affected downstream fixtures for both teams.
         </p>
 
@@ -483,7 +483,7 @@ export default function FixturesPage() {
         {loadError && (
           <div className="space-y-3">
             <p className="text-red-400 text-sm">{loadError}</p>
-            <button onClick={loadAll} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">
+            <button onClick={loadAll} className="btn-secondary px-4 py-2">
               Retry
             </button>
           </div>
@@ -492,8 +492,8 @@ export default function FixturesPage() {
         {!loading && !loadError && (
           <>
             {/* ── Stage 1: Match selection ── */}
-            <div className="bg-gray-900 rounded-xl p-5 mb-5">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+            <div className="card-p5 mb-5">
+              <h2 className="section-label mb-4">
                 1 · Select match to postpone
               </h2>
 
@@ -542,8 +542,8 @@ export default function FixturesPage() {
 
             {/* ── Stage 2: New date input ── */}
             {selectedFixture && (
-              <div className="bg-gray-900 rounded-xl p-5 mb-5">
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+              <div className="card-p5 mb-5">
+                <h2 className="section-label mb-4">
                   2 · Choose new date
                 </h2>
 
@@ -565,7 +565,7 @@ export default function FixturesPage() {
                     type="date"
                     value={newDate}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white w-full max-w-xs"
+                    className="input-base py-1.5 w-full max-w-xs"
                   />
                   {dateError && (
                     <p className="text-red-400 text-xs mt-1">{dateError}</p>
@@ -585,8 +585,8 @@ export default function FixturesPage() {
 
             {/* ── Stage 3: Cascade preview ── */}
             {cascadeRows !== null && selectedFixture && season && (
-              <div className="bg-gray-900 rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+              <div className="card-p5">
+                <h2 className="section-label mb-4">
                   3 · Cascade preview
                 </h2>
 
@@ -679,7 +679,7 @@ export default function FixturesPage() {
                                 <span className="text-gray-600">—</span>
                               )}
                               {row.override && row.flag !== 'conflict' && row.flag !== 'out-of-bounds' && (
-                                <span className="text-blue-400">overridden</span>
+                                <span className="text-green-400">overridden</span>
                               )}
                             </td>
                           </tr>
@@ -697,7 +697,7 @@ export default function FixturesPage() {
                   <button
                     onClick={handleConfirm}
                     disabled={!canConfirmSimple || confirming}
-                    className="px-5 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-40 rounded font-medium text-sm"
+                    className="btn-primary px-5 py-2"
                   >
                     {confirming ? 'Saving…' : 'Confirm all changes'}
                   </button>

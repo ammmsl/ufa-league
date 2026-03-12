@@ -88,49 +88,49 @@ export default async function StandingsPage() {
   const teamOrder = standings.map((row) => row.team_id)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-4xl mx-auto px-4 pb-16 pt-6">
-        <h1 className="text-2xl font-bold mb-1">Standings</h1>
+      <div className="page-container-wide">
+        <h1 className="page-heading">Standings</h1>
         {season && (
-          <p className="text-gray-400 text-sm mb-6">{season.season_name as string}</p>
+          <p className="page-subheading">{season.season_name as string}</p>
         )}
 
         <div className="space-y-6">
           {/* Standings table */}
-          <div className="bg-gray-900 rounded-xl overflow-x-auto">
+          <div className="card-list overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-gray-500 text-xs border-b border-gray-800">
-                  <th className="text-left py-3 px-4 font-normal w-6">#</th>
-                  <th className="text-left py-3 px-4 font-normal">Team</th>
-                  <th className="text-right py-3 px-2 font-normal">P</th>
-                  <th className="text-right py-3 px-2 font-normal">W</th>
-                  <th className="text-right py-3 px-2 font-normal">D</th>
-                  <th className="text-right py-3 px-2 font-normal">L</th>
-                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GS</th>
-                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GA</th>
-                  <th className="text-right py-3 px-2 font-normal hidden md:table-cell">GD</th>
-                  <th className="py-3 px-2 font-normal hidden md:table-cell">Form</th>
-                  <th className="text-right py-3 px-4 font-normal">Pts</th>
+                <tr className="border-b border-gray-800">
+                  <th className="table-th table-th-l text-left w-6">#</th>
+                  <th className="table-th table-th-l text-left">Team</th>
+                  <th className="table-th table-th-sm text-right">P</th>
+                  <th className="table-th table-th-sm text-right">W</th>
+                  <th className="table-th table-th-sm text-right">D</th>
+                  <th className="table-th table-th-sm text-right">L</th>
+                  <th className="table-th table-th-sm text-right hidden md:table-cell">GS</th>
+                  <th className="table-th table-th-sm text-right hidden md:table-cell">GA</th>
+                  <th className="table-th table-th-sm text-right hidden md:table-cell">GD</th>
+                  <th className="table-th table-th-sm hidden md:table-cell">Form</th>
+                  <th className="table-th table-th-r text-right">Pts</th>
                 </tr>
               </thead>
               <tbody>
                 {standings.map((row, i) => (
-                  <tr key={row.team_id} className="border-b border-gray-800 last:border-0">
-                    <td className="py-3 px-4 text-gray-500 text-xs">{i + 1}</td>
-                    <td className="py-3 px-4 font-medium">
-                      <Link href={`/team/${row.team_id}`} className="hover:text-green-400 transition-colors">
+                  <tr key={row.team_id} className="table-row">
+                    <td className="table-td table-td-l text-gray-500 text-xs">{i + 1}</td>
+                    <td className="table-td table-td-l font-medium">
+                      <Link href={`/team/${row.team_id}`} className="link-accent">
                         {row.team_name}
                       </Link>
                     </td>
-                    <td className="py-3 px-2 text-right text-gray-400">{row.played}</td>
-                    <td className="py-3 px-2 text-right">{row.won}</td>
-                    <td className="py-3 px-2 text-right text-gray-400">{row.drawn}</td>
-                    <td className="py-3 px-2 text-right">{row.lost}</td>
-                    <td className="py-3 px-2 text-right text-gray-400 hidden md:table-cell">{row.goals_for}</td>
-                    <td className="py-3 px-2 text-right text-gray-400 hidden md:table-cell">{row.goals_against}</td>
-                    <td className="py-3 px-2 text-right hidden md:table-cell">
+                    <td className="table-td table-td-sm text-right text-gray-400">{row.played}</td>
+                    <td className="table-td table-td-sm text-right">{row.won}</td>
+                    <td className="table-td table-td-sm text-right text-gray-400">{row.drawn}</td>
+                    <td className="table-td table-td-sm text-right">{row.lost}</td>
+                    <td className="table-td table-td-sm text-right text-gray-400 hidden md:table-cell">{row.goals_for}</td>
+                    <td className="table-td table-td-sm text-right text-gray-400 hidden md:table-cell">{row.goals_against}</td>
+                    <td className="table-td table-td-sm text-right hidden md:table-cell">
                       <span
                         className={
                           row.goal_diff > 0
@@ -143,10 +143,10 @@ export default async function StandingsPage() {
                         {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
                       </span>
                     </td>
-                    <td className="py-3 px-2 hidden md:table-cell">
+                    <td className="table-td table-td-sm hidden md:table-cell">
                       <FormGuide form={formGuide.get(row.team_id) ?? []} />
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-green-400">{row.points}</td>
+                    <td className="table-td table-td-r text-right font-bold text-green-400">{row.points}</td>
                   </tr>
                 ))}
               </tbody>
@@ -158,8 +158,8 @@ export default async function StandingsPage() {
           </p>
 
           {/* Position history chart */}
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-gray-400 mb-4">Position History</h2>
+          <div className="card">
+            <h2 className="section-label mb-4">Position History</h2>
             <StandingsChart data={historicalData} teamOrder={teamOrder} />
           </div>
         </div>

@@ -129,9 +129,9 @@ export default async function FixturesPage() {
   const season = await getActiveSeason()
   if (!season) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="page-shell">
         <PublicNav />
-        <div className="max-w-lg mx-auto px-4 pt-6 text-gray-400">No active season.</div>
+        <div className="page-container text-gray-400">No active season.</div>
       </div>
     )
   }
@@ -180,7 +180,7 @@ export default async function FixturesPage() {
   }))
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
       <FixturesCalendar
         fixtures={enrichedFixtures}

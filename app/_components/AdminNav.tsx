@@ -21,10 +21,10 @@ export default function AdminNav() {
           <Link
             key={href}
             href={href}
-            className={`whitespace-nowrap text-sm shrink-0 transition-colors ${
+            className={`whitespace-nowrap text-sm shrink-0 ${
               pathname === href || pathname.startsWith(href + '/')
-                ? 'text-white font-medium'
-                : 'text-gray-400 hover:text-white'
+                ? 'nav-link-active'
+                : 'nav-link-inactive'
             }`}
           >
             {label}

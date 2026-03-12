@@ -36,8 +36,8 @@ export default function PublicNav() {
               <Link
                 key={href}
                 href={href}
-                className={`whitespace-nowrap text-sm transition-colors ${
-                  pathname === href ? 'text-white font-semibold' : 'text-gray-400 hover:text-white'
+                className={`whitespace-nowrap text-sm ${
+                  pathname === href ? 'nav-link-active' : 'nav-link-inactive'
                 }`}
               >
                 {label}
@@ -84,10 +84,10 @@ export default function PublicNav() {
             key={href}
             href={href}
             onClick={() => setMenuOpen(false)}
-            className={`py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
+            className={`py-2.5 px-3 text-sm font-medium rounded-lg ${
               pathname === href
                 ? 'bg-green-900/30 text-green-400'
-                : 'text-gray-400 hover:text-white hover:bg-gray-900'
+                : 'nav-link-inactive hover:bg-gray-900'
             }`}
           >
             {label}

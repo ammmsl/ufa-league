@@ -1,26 +1,359 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface hierarchy (always dark) */
+  --surface-base:    #030712;   /* gray-950 — page background */
+  --surface-card:    #111827;   /* gray-900 — cards, tables */
+  --surface-raised:  #1f2937;   /* gray-800 — inputs, secondary cards, stat cells */
+  --surface-overlay: #374151;   /* gray-700 — tertiary, button hovers */
+
+  /* Borders */
+  --border-card:  #1f2937;      /* gray-800 — card borders, table dividers */
+  --border-input: #374151;      /* gray-700 — input borders */
+
+  /* Text hierarchy */
+  --text-primary:   #ffffff;
+  --text-secondary: #9ca3af;    /* gray-400 */
+  --text-muted:     #6b7280;    /* gray-500 */
+  --text-faint:     #4b5563;    /* gray-600 */
+
+  /* Accent — green only */
+  --accent:        #4ade80;     /* green-400 — text, icons */
+  --accent-bold:   #16a34a;     /* green-600 — primary button bg */
+  --accent-hover:  #15803d;     /* green-700 — primary button hover */
+  --accent-subtle: #14532d40;   /* green-900/25 — badge bg */
+
+  /* Semantic colors */
+  --color-win:     #4ade80;     /* green-400 */
+  --color-loss:    #f87171;     /* red-400 */
+  --color-draw:    #fbbf24;     /* amber-400 */
+  --color-win-bg:  #14532d;     /* green-900 */
+  --color-loss-bg: #450a0a;     /* red-950 */
+
+  /* Layout */
+  --content-width: 32rem;       /* max-w-lg equivalent */
+  --wide-width:    56rem;       /* max-w-4xl equivalent */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Base ──────────────────────────────────────────────────────────────────── */
+
+html {
+  background-color: var(--surface-base);
+  color: var(--text-primary);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Component Utilities ───────────────────────────────────────────────────── */
+
+@layer components {
+
+  /* ── Layout ── */
+
+  .page-shell {
+    min-height: 100vh;
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+  }
+
+  .page-container {
+    max-width: var(--content-width);
+    margin-inline: auto;
+    padding-inline: 1rem;
+    padding-top: 1.5rem;
+    padding-bottom: 4rem;
+  }
+
+  .page-container-wide {
+    max-width: var(--wide-width);
+    margin-inline: auto;
+    padding-inline: 1rem;
+    padding-top: 1.5rem;
+    padding-bottom: 4rem;
+  }
+
+  /* ── Typography ── */
+
+  .page-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .page-subheading {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Cards ── */
+
+  .card {
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .card-p5 {
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .card-p6 {
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+  }
+
+  .card-link {
+    display: block;
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    transition: background-color 150ms;
+  }
+
+  .card-link:hover {
+    background-color: var(--surface-raised);
+  }
+
+  /* Card with list items — children manage their own padding */
+  .card-list {
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  /* ── Tables ── */
+
+  .table-th {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    padding-block: 0.625rem;
+  }
+
+  .table-td {
+    font-size: 0.875rem;
+    padding-block: 0.625rem;
+  }
+
+  /* Inline padding modifiers */
+  .table-th-l, .table-td-l { padding-inline-start: 1rem; }
+  .table-th-r, .table-td-r { padding-inline-end: 1rem; }
+  .table-th-sm, .table-td-sm { padding-inline: 0.5rem; }
+
+  .table-row {
+    border-bottom: 1px solid var(--border-card);
+  }
+
+  .table-row:last-child {
+    border-bottom: none;
+  }
+
+  .table-row-hover {
+    border-bottom: 1px solid var(--border-card);
+    transition: background-color 150ms;
+  }
+
+  .table-row-hover:last-child {
+    border-bottom: none;
+  }
+
+  .table-row-hover:hover {
+    background-color: var(--surface-raised);
+  }
+
+  /* ── Buttons ── */
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: var(--accent-bold);
+    color: #fff;
+    transition: background-color 150ms;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+  }
+
+  .btn-primary:disabled {
+    background-color: var(--surface-raised);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: var(--surface-raised);
+    color: var(--text-secondary);
+    transition: background-color 150ms, color 150ms;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--surface-overlay);
+    color: var(--text-primary);
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    transition: color 150ms, background-color 150ms;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    color: var(--text-primary);
+    background-color: var(--surface-card);
+  }
+
+  /* ── Form Inputs ── */
+
+  .input-base {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-input);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    transition: border-color 150ms, box-shadow 150ms;
+    outline: none;
+  }
+
+  .input-base::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-base:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  /* ── Badges ── */
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .badge-green {
+    background-color: var(--accent-subtle);
+    color: var(--accent);
+  }
+
+  .badge-meta {
+    background-color: var(--surface-raised);
+    color: var(--text-secondary);
+  }
+
+  .badge-win {
+    background-color: var(--color-win-bg);
+    color: var(--color-win);
+  }
+
+  .badge-loss {
+    background-color: var(--color-loss-bg);
+    color: var(--color-loss);
+  }
+
+  .badge-draw {
+    background-color: #451a0340;
+    color: var(--color-draw);
+  }
+
+  /* ── Empty State ── */
+
+  .empty-state {
+    background-color: var(--surface-card);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  /* ── Links ── */
+
+  .link-accent {
+    color: var(--accent);
+    transition: color 150ms;
+  }
+
+  .link-accent:hover {
+    color: #86efac; /* green-300 */
+  }
+
+  .link-muted {
+    color: var(--text-secondary);
+    transition: color 150ms;
+  }
+
+  .link-muted:hover {
+    color: var(--text-primary);
+  }
+
+  /* ── Nav ── */
+
+  .nav-link-active {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .nav-link-inactive {
+    color: var(--text-secondary);
+    transition: color 150ms;
+  }
+
+  .nav-link-inactive:hover {
+    color: var(--text-primary);
+  }
 }

@@ -186,14 +186,11 @@ export default function AdminResultForm({
     }
   }
 
-  const inputBase =
-    'bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500'
-
   return (
     <div className="space-y-5">
       {/* 1. Score */}
-      <div className="bg-gray-900 rounded-xl p-5">
-        <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Score</h3>
+      <div className="card-p5">
+        <h3 className="section-label mb-4">Score</h3>
         <div className="flex items-center justify-center gap-8">
           <div className="text-center">
             <p className="text-sm text-gray-400 mb-3">{homeTeam.team_name}</p>
@@ -236,8 +233,8 @@ export default function AdminResultForm({
       </div>
 
       {/* 2. Absent Players */}
-      <div className="bg-gray-900 rounded-xl p-5">
-        <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Absent Players</h3>
+      <div className="card-p5">
+        <h3 className="section-label mb-4">Absent Players</h3>
         <div className="grid grid-cols-2 gap-6">
           <div>
             <p className="text-xs text-gray-500 mb-3">{homeTeam.team_name}</p>
@@ -248,7 +245,7 @@ export default function AdminResultForm({
                     type="checkbox"
                     checked={absentIds.has(p.player_id)}
                     onChange={() => toggleAbsent(p.player_id)}
-                    className="w-4 h-4 accent-blue-500"
+                    className="w-4 h-4 accent-green-500"
                   />
                   <span
                     className={`text-sm ${absentIds.has(p.player_id) ? 'text-gray-500 line-through' : 'text-gray-200'}`}
@@ -268,7 +265,7 @@ export default function AdminResultForm({
                     type="checkbox"
                     checked={absentIds.has(p.player_id)}
                     onChange={() => toggleAbsent(p.player_id)}
-                    className="w-4 h-4 accent-blue-500"
+                    className="w-4 h-4 accent-green-500"
                   />
                   <span
                     className={`text-sm ${absentIds.has(p.player_id) ? 'text-gray-500 line-through' : 'text-gray-200'}`}
@@ -283,8 +280,8 @@ export default function AdminResultForm({
       </div>
 
       {/* 3. Per-player stats */}
-      <div className="bg-gray-900 rounded-xl p-5">
-        <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Player Stats</h3>
+      <div className="card-p5">
+        <h3 className="section-label mb-4">Player Stats</h3>
         {allPresentPlayers.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">All players marked absent</p>
         ) : (
@@ -313,7 +310,7 @@ export default function AdminResultForm({
                           min={0}
                           value={stats[p.player_id]?.[field] ?? 0}
                           onChange={(e) => setStat(p.player_id, field, Number(e.target.value))}
-                          className={`w-12 text-center ${inputBase} px-1 py-0.5 text-sm`}
+                          className="input-base w-12 px-1 py-0.5 text-sm text-center"
                         />
                       </td>
                     ))}
@@ -326,8 +323,8 @@ export default function AdminResultForm({
       </div>
 
       {/* 4. MVP */}
-      <div className="bg-gray-900 rounded-xl p-5">
-        <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">MVP</h3>
+      <div className="card-p5">
+        <h3 className="section-label mb-4">MVP</h3>
         <div className="grid grid-cols-2 gap-6">
           <div>
             <p className="text-xs text-gray-500 mb-3">{homeTeam.team_name}</p>
@@ -375,8 +372,8 @@ export default function AdminResultForm({
       </div>
 
       {/* 5. Spirit Nominations */}
-      <div className="bg-gray-900 rounded-xl p-5">
-        <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Spirit Nominations</h3>
+      <div className="card-p5">
+        <h3 className="section-label mb-4">Spirit Nominations</h3>
         <div className="space-y-4">
           <div>
             <p className="text-xs text-gray-500 mb-2">
@@ -385,7 +382,7 @@ export default function AdminResultForm({
             <select
               value={spiritHome}
               onChange={(e) => setSpiritHome(e.target.value)}
-              className={`w-full ${inputBase} px-3 py-2`}
+              className="input-base"
             >
               <option value="">— No nomination —</option>
               {presentAwayPlayers.map((p) => (
@@ -402,7 +399,7 @@ export default function AdminResultForm({
             <select
               value={spiritAway}
               onChange={(e) => setSpiritAway(e.target.value)}
-              className={`w-full ${inputBase} px-3 py-2`}
+              className="input-base"
             >
               <option value="">— No nomination —</option>
               {presentHomePlayers.map((p) => (
@@ -434,7 +431,7 @@ export default function AdminResultForm({
         {onCancel && (
           <button
             onClick={onCancel}
-            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
+            className="btn-secondary flex-1 py-3"
           >
             Cancel
           </button>
@@ -442,7 +439,7 @@ export default function AdminResultForm({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-semibold transition-colors"
+          className="btn-primary flex-1 py-3 font-semibold"
         >
           {saving ? 'Saving…' : 'Save Result'}
         </button>

@@ -78,9 +78,9 @@ export default async function HomePage() {
 
   if (!season) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="page-shell">
         <PublicNav />
-        <div className="max-w-lg mx-auto px-4 pt-16 text-center text-gray-400">
+        <div className="page-container pt-16 text-center text-gray-400">
           No active season.
         </div>
       </div>
@@ -94,15 +94,15 @@ export default async function HomePage() {
   ])
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-6">
+      <div className="page-container space-y-6">
 
         {/* Season banner */}
-        <div className="bg-gray-900 rounded-xl p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Season</p>
+        <div className="card">
+          <p className="section-label">Season</p>
           <h1 className="text-xl font-bold">{season.season_name as string}</h1>
-          <span className="inline-block mt-1 text-xs bg-green-900/60 text-green-400 px-2 py-0.5 rounded-full capitalize">
+          <span className="badge badge-green mt-1 capitalize">
             {season.status as string}
           </span>
         </div>
@@ -110,10 +110,10 @@ export default async function HomePage() {
         {/* Upcoming matches */}
         {nextFixtures.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">
+            <h2 className="section-label">
               {nextFixtures.length === 1 ? 'Next Match' : 'Upcoming'}
             </h2>
-            <div className="bg-gray-900 rounded-xl overflow-hidden divide-y divide-gray-800">
+            <div className="card-list divide-y divide-gray-800">
               {nextFixtures.map((f) => (
                 <Link
                   key={f.match_id as string}
@@ -141,32 +141,32 @@ export default async function HomePage() {
         {/* Mini standings */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest">Standings</h2>
-            <Link href="/standings" className="text-xs text-green-400 hover:text-green-300 transition-colors">
+            <h2 className="section-label mb-0">Standings</h2>
+            <Link href="/standings" className="text-xs link-accent">
               View all →
             </Link>
           </div>
-          <div className="bg-gray-900 rounded-xl overflow-hidden">
+          <div className="card-list">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-gray-500 text-xs border-b border-gray-800">
-                  <th className="text-left py-2 px-4 w-6 font-normal">#</th>
-                  <th className="text-left py-2 px-4 font-normal">Team</th>
-                  <th className="text-right py-2 px-4 font-normal w-10">Pts</th>
-                  <th className="text-right py-2 px-4 font-normal w-10">GD</th>
+                <tr className="border-b border-gray-800">
+                  <th className="table-th table-th-l text-left w-6">#</th>
+                  <th className="table-th table-th-l text-left">Team</th>
+                  <th className="table-th table-th-r text-right w-10">Pts</th>
+                  <th className="table-th table-th-r text-right w-10">GD</th>
                 </tr>
               </thead>
               <tbody>
                 {standings.slice(0, 5).map((row, i) => (
-                  <tr key={row.team_id} className="border-b border-gray-800 last:border-0">
-                    <td className="py-2 px-4 text-gray-500 text-xs">{i + 1}</td>
-                    <td className="py-2 px-4 font-medium">
-                      <Link href={`/team/${row.team_id}`} className="hover:text-green-400 transition-colors">
+                  <tr key={row.team_id} className="table-row">
+                    <td className="table-td table-td-l text-gray-500 text-xs">{i + 1}</td>
+                    <td className="table-td table-td-l font-medium">
+                      <Link href={`/team/${row.team_id}`} className="link-accent">
                         {row.team_name}
                       </Link>
                     </td>
-                    <td className="py-2 px-4 text-right font-bold text-green-400">{row.points}</td>
-                    <td className="py-2 px-4 text-right text-gray-400">
+                    <td className="table-td table-td-r text-right font-bold text-green-400">{row.points}</td>
+                    <td className="table-td table-td-r text-right text-gray-400">
                       {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
                     </td>
                   </tr>
@@ -179,10 +179,10 @@ export default async function HomePage() {
         {/* Last result */}
         {lastResult && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Last Result</h2>
+            <h2 className="section-label">Last Result</h2>
             <Link
               href={`/match/${lastResult.match_id as string}`}
-              className="block bg-gray-900 rounded-xl p-4 hover:bg-gray-800 transition-colors"
+              className="card-link"
             >
               <p className="text-xs text-gray-400 mb-2">
                 Matchweek {Number(lastResult.matchweek)} · {fmtKickoff(lastResult.kickoff_time as string)}

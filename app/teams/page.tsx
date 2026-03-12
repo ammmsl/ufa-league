@@ -63,9 +63,9 @@ export default async function TeamsPage() {
   const season = await getActiveSeason()
   if (!season) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="page-shell">
         <PublicNav />
-        <div className="max-w-lg mx-auto px-4 pt-6 text-gray-400">No active season.</div>
+        <div className="page-container text-gray-400">No active season.</div>
       </div>
     )
   }
@@ -73,10 +73,10 @@ export default async function TeamsPage() {
   const teams = await getTeamsWithStats(season.season_id as string)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
-        <h1 className="text-2xl font-bold mb-6">Teams</h1>
+      <div className="page-container">
+        <h1 className="page-heading mb-6">Teams</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {teams.map((t) => {
@@ -89,7 +89,7 @@ export default async function TeamsPage() {
               <Link
                 key={t.team_id as string}
                 href={`/team/${t.team_id as string}`}
-                className="block bg-gray-900 rounded-xl p-5 hover:bg-gray-800 transition-colors"
+                className="card-link"
               >
                 <h2 className="text-lg font-bold mb-1">{t.team_name as string}</h2>
                 <p className="text-sm text-gray-400">

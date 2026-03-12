@@ -3,10 +3,10 @@ import PublicNav from '../_components/PublicNav'
 
 export default function RulesPage() {
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-8">
-        <h1 className="text-2xl font-bold">Rules &amp; About</h1>
+      <div className="page-container space-y-8">
+        <h1 className="page-heading">Rules &amp; About</h1>
 
         {/* Section 1 */}
         <section>
@@ -58,7 +58,7 @@ export default function RulesPage() {
             In this league, after each match each team nominates one player from the opposing team
             who best demonstrated Spirit of the Game — through fair calls, positive attitude, and
             great sportsmanship. These nominations are tallied on the{' '}
-            <Link href="/spirit" className="text-green-400 hover:text-green-300 transition-colors">
+            <Link href="/spirit" className="link-accent">
               Spirit leaderboard
             </Link>
             .

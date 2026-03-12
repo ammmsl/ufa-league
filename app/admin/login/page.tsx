@@ -54,7 +54,7 @@ export default function AdminLogin() {
               placeholder="Admin password"
               required
               autoFocus
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="input-base py-3"
             />
           </div>
 
@@ -65,7 +65,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="btn-primary w-full py-3"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>

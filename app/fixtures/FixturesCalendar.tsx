@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Calendar as CalendarIcon,
   Users,
@@ -478,7 +479,7 @@ export default function FixturesCalendar({
       {/* Stats header */}
       <div className="border-b border-gray-800 px-4 sm:px-6 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-white">Fixtures</h1>
+          <h1 className="page-heading">Fixtures</h1>
           {/* Matches Per Month — hidden on mobile */}
           <div className="hidden sm:flex flex-col items-end">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Matches Per Month</span>
@@ -534,55 +535,11 @@ export default function FixturesCalendar({
           ))}
         </div>
 
-        {/* Mobile mini calendar — hidden on desktop */}
-        <div className="lg:hidden mb-6">
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4">
-            {/* Month nav */}
-            <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={() => setActiveMobileMonth((m) => Math.max(0, m - 1))}
-                disabled={activeMobileMonth === 0}
-                className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-800 transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="font-bold text-sm text-white">
-                {MONTHS_TO_RENDER[activeMobileMonth].toLocaleString('default', { month: 'long', year: 'numeric' })}
-              </span>
-              <button
-                onClick={() => setActiveMobileMonth((m) => Math.min(3, m + 1))}
-                disabled={activeMobileMonth === 3}
-                className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-800 transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            {/* Day-of-week headers */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-[9px] font-semibold text-gray-600 uppercase">{d}</div>
-              ))}
-            </div>
-
-            {/* Mini grid */}
-            <div className="grid grid-cols-7 gap-1">{renderMiniCalendar()}</div>
-
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-800 text-[10px] text-gray-500">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" /> Block 1</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Block 2</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> Block 3</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Holiday</span>
-            </div>
-          </div>
-        </div>
-
         {/* Main grid — fixture list LEFT, calendar RIGHT */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* LEFT col: Fixture list — visible on mobile and desktop */}
-          <div className="space-y-4">
+          <div className={`space-y-4 ${statusFilter === 'completed' ? 'lg:col-span-3' : ''}`}>
             <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 sticky top-6 max-h-[85vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-white sticky top-0 bg-gray-900 z-10 py-2 border-b border-gray-800">
                 <CalendarIcon className="text-green-400" size={20} />
@@ -601,30 +558,17 @@ export default function FixturesCalendar({
 
                   const isHighlightActive = highlightedDate === item.date
 
-                  return (
-                    <React.Fragment key={`${item.date}-${idx}`}>
-                      {/* Rest days indicator */}
-                      {selectedTeam !== ALL &&
-                        !item.isBuffer &&
-                        (item as FixtureEntry).restDays &&
-                        (item as FixtureEntry).isPlaying && (
-                          <div className="flex items-center justify-center my-1 relative z-10">
-                            <div className="bg-green-900/30 border border-green-800/50 text-green-400 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                              {(item as FixtureEntry).restDays} Days Rest
-                            </div>
-                          </div>
-                        )}
-
-                      <div
-                        data-fixture-date={item.originalDate}
-                        onClick={() => handleFixtureClick(item.date)}
-                        className={`relative z-10 rounded-lg p-3 border transition-all duration-300 cursor-pointer hover:shadow-md
-                          ${item.isBuffer ? 'bg-red-950/30 border-red-900/60' : 'bg-gray-800 border-gray-700'}
-                          ${isHighlightActive ? 'ring-2 ring-green-500 shadow-lg border-green-700 scale-[1.02]' : 'hover:border-gray-600'}
-                        `}
-                      >
-                        {item.isBuffer ? (
-                          /* Holiday card */
+                  // Holiday buffer card
+                  if (item.isBuffer) {
+                    return (
+                      <React.Fragment key={`${item.date}-${idx}`}>
+                        <div
+                          data-fixture-date={item.originalDate}
+                          onClick={() => handleFixtureClick(item.date)}
+                          className={`relative z-10 rounded-lg p-3 border transition-all duration-300 cursor-pointer hover:shadow-md bg-red-950/30 border-red-900/60
+                            ${isHighlightActive ? 'ring-2 ring-green-500 shadow-lg border-green-700 scale-[1.02]' : 'hover:border-red-800'}
+                          `}
+                        >
                           <div className="flex items-center gap-3">
                             <div className="bg-red-900/50 p-1.5 rounded text-red-400"><Coffee size={14} /></div>
                             <div>
@@ -634,52 +578,88 @@ export default function FixturesCalendar({
                               </p>
                             </div>
                           </div>
-                        ) : (
-                          /* Match card */
-                          <>
-                            <div className="flex justify-between items-center mb-2">
-                              <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border ${getBlockColors(item.block)}`}>
-                                {item.block} · MW{item.matchweek}
-                              </span>
-                              <span className="text-[10px] font-semibold text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded">
-                                {item.originalDate}
-                              </span>
-                            </div>
+                        </div>
+                      </React.Fragment>
+                    )
+                  }
 
-                            <div className="flex items-center justify-between text-center gap-1.5 mb-2">
-                              <div
-                                className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${
-                                  selectedTeam === item.home_team_name
-                                    ? 'bg-green-700 text-white shadow-sm'
-                                    : 'bg-gray-700 text-white'
-                                }`}
-                              >
-                                {item.home_team_name}
-                              </div>
-                              <span className="text-gray-500 font-bold text-[9px] uppercase px-1 min-w-[3rem] text-center">
-                                {item.score_home != null
-                                  ? `${item.score_home} – ${item.score_away}`
-                                  : 'vs'}
-                              </span>
-                              <div
-                                className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${
-                                  selectedTeam === item.away_team_name
-                                    ? 'bg-green-700 text-white shadow-sm'
-                                    : 'bg-gray-700 text-white'
-                                }`}
-                              >
-                                {item.away_team_name}
-                              </div>
-                            </div>
+                  // Fixture card — compute result styling
+                  const isCompleted = item.score_home != null
+                  const homeWins = isCompleted && item.score_home! > item.score_away!
+                  const awayWins = isCompleted && item.score_away! > item.score_home!
+                  const isDraw = isCompleted && item.score_home === item.score_away
 
-                            <div className="flex justify-end items-center text-[10px] pt-2 border-t border-gray-700">
-                              <span className="text-gray-500 flex items-center gap-1 truncate">
-                                <Info size={11} className="text-gray-600 shrink-0" /> {item.note}
-                              </span>
+                  const homeChipClass = isCompleted
+                    ? homeWins
+                      ? 'bg-green-700 text-white ring-1 ring-green-500'
+                      : awayWins
+                        ? 'bg-gray-800 text-gray-400 opacity-60'
+                        : 'bg-gray-700 text-white'
+                    : selectedTeam === item.home_team_name
+                      ? 'bg-green-700 text-white shadow-sm'
+                      : 'bg-gray-700 text-white'
+
+                  const awayChipClass = isCompleted
+                    ? awayWins
+                      ? 'bg-green-700 text-white ring-1 ring-green-500'
+                      : homeWins
+                        ? 'bg-gray-800 text-gray-400 opacity-60'
+                        : 'bg-gray-700 text-white'
+                    : selectedTeam === item.away_team_name
+                      ? 'bg-green-700 text-white shadow-sm'
+                      : 'bg-gray-700 text-white'
+
+                  return (
+                    <React.Fragment key={`${item.date}-${idx}`}>
+                      {/* Rest days indicator */}
+                      {selectedTeam !== ALL &&
+                        (item as FixtureEntry).restDays &&
+                        (item as FixtureEntry).isPlaying && (
+                          <div className="flex items-center justify-center my-1 relative z-10">
+                            <div className="bg-green-900/30 border border-green-800/50 text-green-400 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                              {(item as FixtureEntry).restDays} Days Rest
                             </div>
-                          </>
+                          </div>
                         )}
-                      </div>
+
+                      <Link
+                        href={`/match/${item.match_id}`}
+                        data-fixture-date={item.originalDate}
+                        className={`block relative z-10 rounded-lg p-3 border transition-all duration-300 hover:shadow-md bg-gray-800 border-gray-700
+                          ${isHighlightActive ? 'ring-2 ring-green-500 shadow-lg border-green-700 scale-[1.02]' : 'hover:border-gray-600'}
+                        `}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border ${getBlockColors(item.block)}`}>
+                            {item.block} · MW{item.matchweek}
+                          </span>
+                          <span className="text-[10px] font-semibold text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded">
+                            {item.originalDate}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-center gap-1.5 mb-2">
+                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${homeChipClass}`}>
+                            {item.home_team_name}
+                          </div>
+                          {isCompleted ? (
+                            <span className={`font-black text-xl px-2 min-w-[3.5rem] text-center ${isDraw ? 'text-amber-400' : 'text-white'}`}>
+                              {item.score_home} – {item.score_away}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 font-bold text-[9px] uppercase px-1 min-w-[3rem] text-center">vs</span>
+                          )}
+                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${awayChipClass}`}>
+                            {item.away_team_name}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end items-center text-[10px] pt-2 border-t border-gray-700">
+                          <span className="text-gray-500 flex items-center gap-1 truncate">
+                            <Info size={11} className="text-gray-600 shrink-0" /> {item.note}
+                          </span>
+                        </div>
+                      </Link>
                     </React.Fragment>
                   )
                 })}
@@ -691,8 +671,8 @@ export default function FixturesCalendar({
             </div>
           </div>
 
-          {/* RIGHT col: Season Calendar — desktop only */}
-          <div className="hidden lg:block lg:col-span-2 space-y-6">
+          {/* RIGHT col: Season Calendar — desktop only, hidden on completed tab */}
+          {statusFilter !== 'completed' && <div className="hidden lg:block lg:col-span-2 space-y-6">
             <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 flex flex-col h-[85vh]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-white">
@@ -739,9 +719,56 @@ export default function FixturesCalendar({
                 ))}
               </div>
             </div>
-          </div>
+          </div>}
 
         </div>
+
+        {/* Mobile mini calendar — after fixture list, hidden on desktop and on completed tab */}
+        {statusFilter !== 'completed' && (
+          <div className="lg:hidden mt-6">
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+              {/* Month nav */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setActiveMobileMonth((m) => Math.max(0, m - 1))}
+                  disabled={activeMobileMonth === 0}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-800 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="font-bold text-sm text-white">
+                  {MONTHS_TO_RENDER[activeMobileMonth].toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </span>
+                <button
+                  onClick={() => setActiveMobileMonth((m) => Math.min(3, m + 1))}
+                  disabled={activeMobileMonth === 3}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-800 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              {/* Day-of-week headers */}
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} className="text-center text-[9px] font-semibold text-gray-600 uppercase">{d}</div>
+                ))}
+              </div>
+
+              {/* Mini grid */}
+              <div className="grid grid-cols-7 gap-1">{renderMiniCalendar()}</div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-800 text-[10px] text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" /> Block 1</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Block 2</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> Block 3</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Holiday</span>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   )

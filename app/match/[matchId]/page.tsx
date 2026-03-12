@@ -205,7 +205,7 @@ export default async function MatchPage({
               href="https://maps.app.goo.gl/BcCYS36FRZcQmoBB8"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:text-gray-200 transition-colors"
+              className="link-muted underline"
             >
               {match.venue as string} ↗
             </a>
@@ -213,11 +213,11 @@ export default async function MatchPage({
         )}
 
         {/* Score card */}
-        <div className="bg-gray-900 rounded-xl p-6 text-center mb-4">
+        <div className="card-p6 text-center mb-4">
           <div className="flex items-center justify-between gap-2">
             <Link
               href={`/team/${match.home_team_id as string}`}
-              className={`text-base font-bold flex-1 text-left leading-tight hover:text-green-400 transition-colors ${homeWon ? 'text-white' : 'text-gray-400'}`}
+              className={`text-base font-bold flex-1 text-left leading-tight link-accent ${homeWon ? 'text-white' : 'text-gray-400'}`}
             >
               {match.home_team_name as string}
             </Link>
@@ -226,7 +226,7 @@ export default async function MatchPage({
             </div>
             <Link
               href={`/team/${match.away_team_id as string}`}
-              className={`text-base font-bold flex-1 text-right leading-tight hover:text-green-400 transition-colors ${awayWon ? 'text-white' : 'text-gray-400'}`}
+              className={`text-base font-bold flex-1 text-right leading-tight link-accent ${awayWon ? 'text-white' : 'text-gray-400'}`}
             >
               {match.away_team_name as string}
             </Link>
@@ -240,8 +240,8 @@ export default async function MatchPage({
           match.mvp_name ||
           nominations.length > 0
         ) && (
-          <div className="bg-gray-900 rounded-xl p-4 mb-4">
-            <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3">Top Stats</h3>
+          <div className="card mb-4">
+            <h3 className="section-label mb-3">Top Stats</h3>
             <div className="space-y-2.5">
               {topScorer && Number(topScorer.goals) > 0 && (
                 <div className="flex items-center gap-3 text-sm">
@@ -249,7 +249,7 @@ export default async function MatchPage({
                   <span className="text-gray-400 w-24 shrink-0 text-xs">Top Scorer</span>
                   <Link
                     href={`/player/${topScorer.player_id as string}`}
-                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                    className="text-white font-medium link-accent flex-1 truncate"
                   >
                     {topScorer.display_name as string}
                   </Link>
@@ -264,7 +264,7 @@ export default async function MatchPage({
                   <span className="text-gray-400 w-24 shrink-0 text-xs">Top Assister</span>
                   <Link
                     href={`/player/${topAssister.player_id as string}`}
-                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                    className="text-white font-medium link-accent flex-1 truncate"
                   >
                     {topAssister.display_name as string}
                   </Link>
@@ -279,7 +279,7 @@ export default async function MatchPage({
                   <span className="text-gray-400 w-24 shrink-0 text-xs">Match MVP</span>
                   <Link
                     href={`/player/${match.mvp_id as string}`}
-                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                    className="text-white font-medium link-accent flex-1 truncate"
                   >
                     {match.mvp_name as string}
                   </Link>
@@ -291,7 +291,7 @@ export default async function MatchPage({
                   <span className="text-gray-400 w-24 shrink-0 text-xs">Spirit</span>
                   <Link
                     href={`/player/${n.nominated_player_id as string}`}
-                    className="text-white font-medium hover:text-green-400 transition-colors flex-1 truncate"
+                    className="text-white font-medium link-accent flex-1 truncate"
                   >
                     {n.nominated_player_name as string}
                   </Link>
@@ -303,7 +303,7 @@ export default async function MatchPage({
 
         {/* Per-player stats */}
         {(homeStats.length > 0 || awayStats.length > 0 || homeAbsences.length > 0 || awayAbsences.length > 0) && (
-          <div className="bg-gray-900 rounded-xl overflow-hidden mb-4">
+          <div className="card-list mb-4">
             <div className="grid grid-cols-2 divide-x divide-gray-800">
 
               {/* Home */}
@@ -324,7 +324,7 @@ export default async function MatchPage({
                     {homeStats.map((s) => (
                       <tr key={s.player_id as string} className="border-b border-gray-800 last:border-0">
                         <td className="py-1.5 px-3">
-                          <Link href={`/player/${s.player_id as string}`} className="hover:text-green-400 transition-colors">
+                          <Link href={`/player/${s.player_id as string}`} className="link-accent">
                             {s.display_name as string}
                           </Link>
                         </td>
@@ -363,7 +363,7 @@ export default async function MatchPage({
                     {awayStats.map((s) => (
                       <tr key={s.player_id as string} className="border-b border-gray-800 last:border-0">
                         <td className="py-1.5 px-3">
-                          <Link href={`/player/${s.player_id as string}`} className="hover:text-green-400 transition-colors">
+                          <Link href={`/player/${s.player_id as string}`} className="link-accent">
                             {s.display_name as string}
                           </Link>
                         </td>
@@ -390,15 +390,15 @@ export default async function MatchPage({
 
         {/* Spirit nominations */}
         {nominations.length > 0 && (
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3">Spirit Nominations</h3>
+          <div className="card">
+            <h3 className="section-label mb-3">Spirit Nominations</h3>
             <div className="space-y-2">
               {nominations.map((n) => (
                 <div key={n.nominating_team_id as string} className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">{n.nominating_team_name as string}</span>
                   <Link
                     href={`/player/${n.nominated_player_id as string}`}
-                    className="text-green-400 hover:text-green-300 transition-colors"
+                    className="link-accent"
                   >
                     {n.nominated_player_name as string}
                   </Link>
@@ -411,9 +411,9 @@ export default async function MatchPage({
     )
 
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="page-shell">
         <PublicNav />
-        <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
+        <div className="page-container">
           <AdminCompletedLayout
             isAdmin={isAdmin}
             matchId={matchId}
@@ -436,9 +436,9 @@ export default async function MatchPage({
   ])
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
+      <div className="page-container">
 
         <p className="text-xs text-gray-400 text-center mb-0.5">
           Matchweek {Number(match.matchweek)}
@@ -447,18 +447,18 @@ export default async function MatchPage({
           {fmtKickoffShort(match.kickoff_time as string)}
         </p>
 
-        <div className="bg-gray-900 rounded-xl p-6 text-center mb-6">
+        <div className="card-p6 text-center mb-6">
           <div className="flex items-center justify-between gap-4">
             <Link
               href={`/team/${match.home_team_id as string}`}
-              className="text-xl font-bold flex-1 text-left leading-tight hover:text-green-400 transition-colors"
+              className="text-xl font-bold flex-1 text-left leading-tight link-accent"
             >
               {match.home_team_name as string}
             </Link>
             <span className="text-2xl text-gray-500 font-light shrink-0">vs</span>
             <Link
               href={`/team/${match.away_team_id as string}`}
-              className="text-xl font-bold flex-1 text-right leading-tight hover:text-green-400 transition-colors"
+              className="text-xl font-bold flex-1 text-right leading-tight link-accent"
             >
               {match.away_team_name as string}
             </Link>
@@ -469,7 +469,7 @@ export default async function MatchPage({
                 href="https://maps.app.goo.gl/BcCYS36FRZcQmoBB8"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-gray-200 transition-colors"
+                className="link-muted underline"
               >
                 {match.venue as string} ↗
               </a>
@@ -479,8 +479,8 @@ export default async function MatchPage({
 
         {/* Rosters */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3 truncate">
+          <div className="card">
+            <h3 className="section-label truncate">
               {match.home_team_name as string}
             </h3>
             <ul className="space-y-1.5">
@@ -488,7 +488,7 @@ export default async function MatchPage({
                 <li key={p.player_id as string}>
                   <Link
                     href={`/player/${p.player_id as string}`}
-                    className="text-sm text-gray-300 hover:text-white transition-colors"
+                    className="text-sm link-muted"
                   >
                     {p.display_name as string}
                   </Link>
@@ -496,8 +496,8 @@ export default async function MatchPage({
               ))}
             </ul>
           </div>
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3 truncate">
+          <div className="card">
+            <h3 className="section-label truncate">
               {match.away_team_name as string}
             </h3>
             <ul className="space-y-1.5">
@@ -505,7 +505,7 @@ export default async function MatchPage({
                 <li key={p.player_id as string}>
                   <Link
                     href={`/player/${p.player_id as string}`}
-                    className="text-sm text-gray-300 hover:text-white transition-colors"
+                    className="text-sm link-muted"
                   >
                     {p.display_name as string}
                   </Link>

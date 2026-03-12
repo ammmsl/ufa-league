@@ -19,9 +19,9 @@ export default async function AdminDashboard() {
 
   if (!season) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="page-shell">
         <AdminNav />
-        <div className="max-w-lg mx-auto px-4 py-8">
+        <div className="page-container">
           <p className="text-gray-500">No season found in database.</p>
         </div>
       </div>
@@ -97,17 +97,17 @@ export default async function AdminDashboard() {
   const remaining = total - completed
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <AdminNav />
-      <div className="max-w-lg mx-auto px-4 py-6 pb-16 space-y-6">
+      <div className="page-container space-y-6">
 
         {/* Section 1 — Pending Results */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h2 className="section-label mb-3">
             Pending Results
           </h2>
           {pending.length === 0 ? (
-            <div className="bg-gray-900 rounded-xl px-4 py-3 flex items-center gap-2">
+            <div className="card flex items-center gap-2">
               <span className="text-green-400 text-sm font-medium">✓ All results up to date</span>
             </div>
           ) : (
@@ -116,7 +116,7 @@ export default async function AdminDashboard() {
                 <li key={f.match_id}>
                   <Link
                     href={`/match/${f.match_id}`}
-                    className="block bg-gray-900 hover:bg-gray-800 rounded-xl px-4 py-3 transition-colors"
+                    className="card-link"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -138,13 +138,13 @@ export default async function AdminDashboard() {
 
         {/* Section 2 — Next Match */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h2 className="section-label mb-3">
             Next Match
           </h2>
           {nextMatch ? (
             <Link
               href={`/match/${nextMatch.match_id}`}
-              className="block bg-gray-900 hover:bg-gray-800 rounded-xl px-4 py-3 transition-colors"
+              className="card-link"
             >
               <p className="text-sm font-medium">
                 {nextMatch.home_team_name} vs {nextMatch.away_team_name}
@@ -154,7 +154,7 @@ export default async function AdminDashboard() {
               </p>
             </Link>
           ) : (
-            <div className="bg-gray-900 rounded-xl px-4 py-3">
+            <div className="card">
               <p className="text-sm text-gray-500">No upcoming matches scheduled.</p>
             </div>
           )}
@@ -162,13 +162,13 @@ export default async function AdminDashboard() {
 
         {/* Section 3 — Recent Activity */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h2 className="section-label mb-3">
             Recent Activity
           </h2>
           {recentResult ? (
             <Link
               href={`/match/${recentResult.match_id}`}
-              className="block bg-gray-900 hover:bg-gray-800 rounded-xl px-4 py-3 transition-colors"
+              className="card-link"
             >
               <p className="text-sm font-medium">
                 {recentResult.home_team_name}{' '}
@@ -182,7 +182,7 @@ export default async function AdminDashboard() {
               </p>
             </Link>
           ) : (
-            <div className="bg-gray-900 rounded-xl px-4 py-3">
+            <div className="card">
               <p className="text-sm text-gray-500">No results entered yet.</p>
             </div>
           )}
@@ -190,10 +190,10 @@ export default async function AdminDashboard() {
 
         {/* Section 4 — Season at a Glance */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h2 className="section-label mb-3">
             Season at a Glance — {season.season_name}
           </h2>
-          <div className="bg-gray-900 rounded-xl px-4 py-4">
+          <div className="card">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold">{total}</p>

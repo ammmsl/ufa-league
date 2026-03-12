@@ -4,6 +4,7 @@ import sql from '@/lib/db'
 import { getStandings } from '@/lib/standings'
 import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
+import StatCard from '../../_components/StatCard'
 
 export const revalidate = 0
 
@@ -121,18 +122,18 @@ export default async function PlayerPage({
   const totalBlocks  = totals ? Number(totals.total_blocks)   : 0
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="page-shell">
       <PublicNav />
-      <div className="max-w-lg mx-auto px-4 pb-16 pt-6 space-y-6">
+      <div className="page-container space-y-6">
 
         {/* Header */}
-        <div className="bg-gray-900 rounded-xl p-5">
+        <div className="card-p5">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold">{player.display_name as string}</h1>
+              <h1 className="page-heading">{player.display_name as string}</h1>
               <Link
                 href={`/team/${player.team_id as string}`}
-                className="text-sm text-green-400 hover:text-green-300 transition-colors mt-1 inline-block"
+                className="link-accent text-sm mt-1 inline-block"
               >
                 {player.team_name as string}
                 {leaguePosition > 0 && (
@@ -151,53 +152,46 @@ export default async function PlayerPage({
 
         {/* Season totals */}
         <div>
-          <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Season Totals</h2>
+          <h2 className="section-label">Season Totals</h2>
           <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: 'Apps',    value: appearances  },
-              { label: 'Goals',   value: totalGoals   },
-              { label: 'Assists', value: totalAssists },
-              { label: 'Blocks',  value: totalBlocks  },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-gray-900 rounded-xl py-4 text-center">
-                <p className="text-2xl font-bold">{value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{label}</p>
-              </div>
-            ))}
+            <StatCard label="Apps"    value={appearances}  />
+            <StatCard label="Goals"   value={totalGoals}   />
+            <StatCard label="Assists" value={totalAssists} />
+            <StatCard label="Blocks"  value={totalBlocks}  />
           </div>
         </div>
 
         {/* Match log */}
         {matchLog.length > 0 && (
           <div>
-            <h2 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Match Log</h2>
-            <div className="bg-gray-900 rounded-xl overflow-x-auto">
+            <h2 className="section-label">Match Log</h2>
+            <div className="card-list overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-gray-500 text-xs border-b border-gray-800">
-                    <th className="text-left py-2 px-4 font-normal">Date</th>
-                    <th className="text-left py-2 px-3 font-normal">Opponent</th>
-                    <th className="text-right py-2 px-2 font-normal">Res</th>
-                    <th className="text-right py-2 px-2 font-normal">G</th>
-                    <th className="text-right py-2 px-2 font-normal">A</th>
-                    <th className="text-right py-2 px-4 font-normal">B</th>
+                  <tr className="border-b border-gray-800">
+                    <th className="table-th table-th-l text-left">Date</th>
+                    <th className="table-th table-th-sm text-left">Opponent</th>
+                    <th className="table-th table-th-sm text-right">Res</th>
+                    <th className="table-th table-th-sm text-right">G</th>
+                    <th className="table-th table-th-sm text-right">A</th>
+                    <th className="table-th table-th-r text-right">B</th>
                   </tr>
                 </thead>
                 <tbody>
                   {matchLog.map((m) => (
-                    <tr key={m.match_id} className="border-b border-gray-800 last:border-0">
-                      <td className="py-2 px-4 text-gray-400 text-xs whitespace-nowrap">
+                    <tr key={m.match_id} className="table-row">
+                      <td className="table-td table-td-l text-gray-400 text-xs whitespace-nowrap">
                         {fmtDate(m.kickoff_time)}
                       </td>
-                      <td className="py-2 px-3 truncate max-w-[7rem]">
+                      <td className="table-td table-td-sm truncate max-w-[7rem]">
                         <Link
                           href={`/team/${m.oppId}`}
-                          className="hover:text-green-400 transition-colors"
+                          className="link-accent"
                         >
                           {m.opponent}
                         </Link>
                       </td>
-                      <td className="py-2 px-2 text-right">
+                      <td className="table-td table-td-sm text-right">
                         <span
                           className={
                             m.result === 'W'
@@ -210,9 +204,9 @@ export default async function PlayerPage({
                           {m.result} {m.myScore}–{m.oppScore}
                         </span>
                       </td>
-                      <td className="py-2 px-2 text-right tabular-nums">{m.goals}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{m.assists}</td>
-                      <td className="py-2 px-4 text-right tabular-nums">{m.blocks}</td>
+                      <td className="table-td table-td-sm text-right tabular-nums">{m.goals}</td>
+                      <td className="table-td table-td-sm text-right tabular-nums">{m.assists}</td>
+                      <td className="table-td table-td-r text-right tabular-nums">{m.blocks}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,7 +216,7 @@ export default async function PlayerPage({
         )}
 
         {matchLog.length === 0 && (
-          <p className="text-gray-400 text-sm">No match appearances yet.</p>
+          <div className="empty-state">No match appearances yet.</div>
         )}
 
       </div>
