@@ -2,6 +2,7 @@ import Link from 'next/link'
 import sql from '@/lib/db'
 import { getStandings } from '@/lib/standings'
 import PublicNav from './_components/PublicNav'
+import { TeamAvatar } from './_components/Avatar'
 
 export const revalidate = 0
 
@@ -21,7 +22,9 @@ async function getNextFixtures(seasonId: string) {
       f.match_id::text,
       f.kickoff_time,
       f.matchweek,
+      ht.team_id::text AS home_team_id,
       ht.team_name AS home_team_name,
+      at.team_id::text AS away_team_id,
       at.team_name AS away_team_name
     FROM fixtures f
     JOIN teams ht ON ht.team_id = f.home_team_id
@@ -41,7 +44,9 @@ async function getLastResult(seasonId: string) {
       f.match_id::text,
       f.kickoff_time,
       f.matchweek,
+      ht.team_id::text AS home_team_id,
       ht.team_name AS home_team_name,
+      at.team_id::text AS away_team_id,
       at.team_name AS away_team_name,
       mr.score_home,
       mr.score_away
@@ -124,13 +129,15 @@ export default async function HomePage() {
                     Matchweek {Number(f.matchweek)} · {fmtKickoff(f.kickoff_time as string)}
                   </p>
                   <div className="flex items-center gap-3">
-                    <span className="text-white font-semibold text-sm flex-1">
-                      {f.home_team_name as string}
-                    </span>
-                    <span className="text-gray-500 text-xs">vs</span>
-                    <span className="text-white font-semibold text-sm flex-1 text-right">
-                      {f.away_team_name as string}
-                    </span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <TeamAvatar id={f.home_team_id as string} name={f.home_team_name as string} size={24} />
+                      <span className="text-white font-semibold text-sm">{f.home_team_name as string}</span>
+                    </div>
+                    <span className="text-gray-500 text-xs shrink-0">vs</span>
+                    <div className="flex items-center justify-end gap-2 flex-1">
+                      <span className="text-white font-semibold text-sm">{f.away_team_name as string}</span>
+                      <TeamAvatar id={f.away_team_id as string} name={f.away_team_name as string} size={24} />
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -161,9 +168,12 @@ export default async function HomePage() {
                   <tr key={row.team_id} className="table-row">
                     <td className="table-td table-td-l text-gray-500 text-xs">{i + 1}</td>
                     <td className="table-td table-td-l font-medium">
-                      <Link href={`/team/${row.team_id}`} className="link-accent">
-                        {row.team_name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <TeamAvatar id={row.team_id} name={row.team_name} size={20} />
+                        <Link href={`/team/${row.team_id}`} className="link-accent">
+                          {row.team_name}
+                        </Link>
+                      </div>
                     </td>
                     <td className="table-td table-td-r text-right font-bold text-green-400">{row.points}</td>
                     <td className="table-td table-td-r text-right text-gray-400">
@@ -188,15 +198,17 @@ export default async function HomePage() {
                 Matchweek {Number(lastResult.matchweek)} · {fmtKickoff(lastResult.kickoff_time as string)}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-white font-semibold text-sm flex-1">
-                  {lastResult.home_team_name as string}
-                </span>
-                <span className="text-white font-bold text-lg tabular-nums">
+                <div className="flex items-center gap-2 flex-1">
+                  <TeamAvatar id={lastResult.home_team_id as string} name={lastResult.home_team_name as string} size={24} />
+                  <span className="text-white font-semibold text-sm">{lastResult.home_team_name as string}</span>
+                </div>
+                <span className="text-white font-bold text-lg tabular-nums shrink-0">
                   {Number(lastResult.score_home)} – {Number(lastResult.score_away)}
                 </span>
-                <span className="text-white font-semibold text-sm flex-1 text-right">
-                  {lastResult.away_team_name as string}
-                </span>
+                <div className="flex items-center justify-end gap-2 flex-1">
+                  <span className="text-white font-semibold text-sm">{lastResult.away_team_name as string}</span>
+                  <TeamAvatar id={lastResult.away_team_id as string} name={lastResult.away_team_name as string} size={24} />
+                </div>
               </div>
             </Link>
           </div>

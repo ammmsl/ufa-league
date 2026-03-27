@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import sql from '@/lib/db'
 import PublicNav from '../_components/PublicNav'
+import { TeamAvatar } from '../_components/Avatar'
 
 export const revalidate = 0
 
@@ -91,7 +92,10 @@ export default async function TeamsPage() {
                 href={`/team/${t.team_id as string}`}
                 className="card-link"
               >
-                <h2 className="text-lg font-bold mb-1">{t.team_name as string}</h2>
+                <div className="flex items-center gap-3 mb-2">
+                  <TeamAvatar id={t.team_id as string} name={t.team_name as string} size={48} />
+                  <h2 className="text-lg font-bold">{t.team_name as string}</h2>
+                </div>
                 <p className="text-sm text-gray-400">
                   {Number(t.player_count)} players
                   {played > 0 && (

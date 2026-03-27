@@ -3,6 +3,7 @@ import sql from '@/lib/db'
 import { getStandings, getHistoricalStandings } from '@/lib/standings'
 import PublicNav from '../_components/PublicNav'
 import StandingsChart from './StandingsChart'
+import { TeamAvatar } from '../_components/Avatar'
 
 export const revalidate = 0
 
@@ -120,9 +121,12 @@ export default async function StandingsPage() {
                   <tr key={row.team_id} className="table-row">
                     <td className="table-td table-td-l text-gray-500 text-xs">{i + 1}</td>
                     <td className="table-td table-td-l font-medium">
-                      <Link href={`/team/${row.team_id}`} className="link-accent">
-                        {row.team_name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <TeamAvatar id={row.team_id} name={row.team_name} size={20} />
+                        <Link href={`/team/${row.team_id}`} className="link-accent">
+                          {row.team_name}
+                        </Link>
+                      </div>
                     </td>
                     <td className="table-td table-td-sm text-right text-gray-400">{row.played}</td>
                     <td className="table-td table-td-sm text-right">{row.won}</td>

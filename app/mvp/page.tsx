@@ -1,10 +1,46 @@
-import Link from 'next/link'
 import sql from '@/lib/db'
 import PublicNav from '../_components/PublicNav'
+import MvpClient from './MvpClient'
 
 export const revalidate = 0
 
-async function getMvpScores() {
+async function getActiveSeason() {
+  const rows = await sql`
+    SELECT season_id::text, season_name
+    FROM seasons
+    WHERE status = 'active'
+    LIMIT 1
+  `
+  return rows[0] ?? null
+}
+
+export type MvpRow = {
+  player_id:       string
+  display_name:    string
+  team_id:         string
+  team_name:       string
+  total_goals:     number
+  total_assists:   number
+  total_blocks:    number
+  match_mvp_wins:  number
+  composite_score: number
+}
+
+export type MvpHistoryRow = {
+  player_id:     string
+  display_name:  string
+  team_name:     string
+  matchweek:     number
+  cum_composite: number
+}
+
+export type MvpClientProps = {
+  seasonName: string
+  rows:       MvpRow[]
+  history:    MvpHistoryRow[]
+}
+
+async function getMvpScores(seasonId: string): Promise<MvpRow[]> {
   const rows = await sql`
     SELECT
       player_id::text,
@@ -17,69 +53,92 @@ async function getMvpScores() {
       match_mvp_wins::int,
       composite_score::int
     FROM season_mvp_scores
+    WHERE season_id = ${seasonId}::uuid
   `
-  return rows
+  return rows.map((r) => ({
+    player_id:       String(r.player_id),
+    display_name:    String(r.display_name),
+    team_id:         String(r.team_id),
+    team_name:       String(r.team_name),
+    total_goals:     Number(r.total_goals),
+    total_assists:   Number(r.total_assists),
+    total_blocks:    Number(r.total_blocks),
+    match_mvp_wins:  Number(r.match_mvp_wins),
+    composite_score: Number(r.composite_score),
+  }))
+}
+
+async function getMvpHistory(seasonId: string): Promise<MvpHistoryRow[]> {
+  const rows = await sql`
+    WITH matchweek_totals AS (
+      SELECT
+        pms.player_id::text,
+        p.display_name,
+        t.team_name,
+        f.matchweek,
+        SUM(pms.goals)::int   AS goals,
+        SUM(pms.assists)::int AS assists,
+        SUM(pms.blocks)::int  AS blocks,
+        COUNT(mr.match_result_id)::int AS mvp_wins
+      FROM player_match_stats pms
+      JOIN players  p  ON p.player_id  = pms.player_id
+      JOIN teams    t  ON t.team_id    = p.team_id
+      JOIN fixtures f  ON f.match_id   = pms.match_id
+      LEFT JOIN match_results mr
+             ON mr.match_id        = pms.match_id
+            AND mr.mvp_player_id   = pms.player_id
+      WHERE t.season_id = ${seasonId}
+      GROUP BY pms.player_id, p.display_name, t.team_name, f.matchweek
+    )
+    SELECT
+      player_id,
+      display_name,
+      team_name,
+      matchweek,
+      SUM(goals * 3 + assists * 3 + blocks * 2 + mvp_wins * 5)
+        OVER (PARTITION BY player_id ORDER BY matchweek)::int AS cum_composite
+    FROM matchweek_totals
+    ORDER BY player_id, matchweek
+  `
+  return rows.map((r) => ({
+    player_id:     String(r.player_id),
+    display_name:  String(r.display_name),
+    team_name:     String(r.team_name),
+    matchweek:     Number(r.matchweek),
+    cum_composite: Number(r.cum_composite),
+  }))
 }
 
 export default async function MvpPage() {
-  const rows = await getMvpScores()
+  const season = await getActiveSeason()
 
-  return (
-    <div className="page-shell">
-      <PublicNav />
-      <div className="page-container">
-        <h1 className="page-heading">Season MVP</h1>
-        <p className="page-subheading">
-          Score = (Goals × 3) + (Assists × 3) + (Blocks × 2) + (MVP wins × 5)
-        </p>
-
-        <div className="card-list overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="table-th table-th-l text-left w-8">#</th>
-                <th className="table-th table-th-sm text-left">Player</th>
-                <th className="table-th table-th-sm text-left">Team</th>
-                <th className="table-th table-th-sm text-right text-green-400">Score</th>
-                <th className="table-th table-th-sm text-right">G</th>
-                <th className="table-th table-th-sm text-right">A</th>
-                <th className="table-th table-th-sm text-right">B</th>
-                <th className="table-th table-th-r text-right">MVP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.player_id as string} className="table-row">
-                  <td className="table-td table-td-l text-gray-500 text-xs">{i + 1}</td>
-                  <td className="table-td table-td-sm font-medium">
-                    <Link
-                      href={`/player/${row.player_id as string}`}
-                      className="link-accent"
-                    >
-                      {row.display_name as string}
-                    </Link>
-                  </td>
-                  <td className="table-td table-td-sm text-gray-400">
-                    <Link
-                      href={`/team/${row.team_id as string}`}
-                      className="link-muted"
-                    >
-                      {row.team_name as string}
-                    </Link>
-                  </td>
-                  <td className="table-td table-td-sm text-right font-bold text-green-400">
-                    {Number(row.composite_score)}
-                  </td>
-                  <td className="table-td table-td-sm text-right text-gray-400">{Number(row.total_goals)}</td>
-                  <td className="table-td table-td-sm text-right text-gray-400">{Number(row.total_assists)}</td>
-                  <td className="table-td table-td-sm text-right text-gray-400">{Number(row.total_blocks)}</td>
-                  <td className="table-td table-td-r text-right text-gray-400">{Number(row.match_mvp_wins)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  if (!season) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white">
+        <PublicNav />
+        <div className="max-w-lg mx-auto px-4 pb-16 pt-6">
+          <h1 className="text-2xl font-bold mb-1">MVP Race</h1>
+          <p className="text-gray-400 text-sm">No active season.</p>
         </div>
       </div>
+    )
+  }
+
+  const seasonId = season.season_id as string
+
+  const [rows, history] = await Promise.all([
+    getMvpScores(seasonId),
+    getMvpHistory(seasonId),
+  ])
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+      <PublicNav />
+      <MvpClient
+        seasonName={season.season_name as string}
+        rows={rows}
+        history={history}
+      />
     </div>
   )
 }

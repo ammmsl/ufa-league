@@ -54,23 +54,28 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Season-complete guard — query before entering the transaction
-  const guard = await sql`
-    SELECT s.status
-    FROM fixtures f
-    JOIN seasons s ON s.season_id = f.season_id
-    WHERE f.match_id = ${match_id}
-  `
+  try {
+    // Season-complete guard — query before entering the transaction
+    const guard = await sql`
+      SELECT s.status
+      FROM fixtures f
+      JOIN seasons s ON s.season_id = f.season_id
+      WHERE f.match_id = ${match_id}
+    `
 
-  if (guard.length === 0) {
-    return NextResponse.json({ error: 'Match not found' }, { status: 404 })
-  }
+    if (guard.length === 0) {
+      return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+    }
 
-  if (guard[0].status === 'complete') {
-    return NextResponse.json(
-      { error: 'Season is complete — result entry is locked' },
-      { status: 403 }
-    )
+    if (guard[0].status === 'complete') {
+      return NextResponse.json(
+        { error: 'Season is complete — result entry is locked' },
+        { status: 403 }
+      )
+    }
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 
   try {

@@ -5,6 +5,7 @@ import { getStandings } from '@/lib/standings'
 import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
 import StatCard from '../../_components/StatCard'
+import { PlayerAvatar } from '../../_components/Avatar'
 
 export const revalidate = 0
 
@@ -129,17 +130,20 @@ export default async function PlayerPage({
         {/* Header */}
         <div className="card-p5">
           <div className="flex items-start justify-between">
-            <div>
-              <h1 className="page-heading">{player.display_name as string}</h1>
-              <Link
-                href={`/team/${player.team_id as string}`}
-                className="link-accent text-sm mt-1 inline-block"
-              >
-                {player.team_name as string}
-                {leaguePosition > 0 && (
-                  <span className="text-gray-500 ml-1">· {ordinal(leaguePosition)}</span>
-                )}
-              </Link>
+            <div className="flex items-start gap-4">
+              <PlayerAvatar id={player.player_id as string} name={player.display_name as string} size={56} />
+              <div>
+                <h1 className="page-heading">{player.display_name as string}</h1>
+                <Link
+                  href={`/team/${player.team_id as string}`}
+                  className="link-accent text-sm mt-1 inline-block"
+                >
+                  {player.team_name as string}
+                  {leaguePosition > 0 && (
+                    <span className="text-gray-500 ml-1">· {ordinal(leaguePosition)}</span>
+                  )}
+                </Link>
+              </div>
             </div>
             {spiritTotal > 0 && (
               <div className="text-center shrink-0 ml-4">

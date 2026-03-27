@@ -7,18 +7,23 @@ export async function DELETE(
 ) {
   const { holidayId } = await params
 
-  const result = await sql`
-    DELETE FROM season_holidays
-    WHERE holiday_id = ${holidayId}
-    RETURNING holiday_id
-  `
+  try {
+    const result = await sql`
+      DELETE FROM season_holidays
+      WHERE holiday_id = ${holidayId}
+      RETURNING holiday_id
+    `
 
-  if (result.length === 0) {
-    return NextResponse.json(
-      { error: 'Holiday not found' },
-      { status: 404 }
-    )
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Holiday not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ deleted: result[0].holiday_id })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-
-  return NextResponse.json({ deleted: result[0].holiday_id })
 }

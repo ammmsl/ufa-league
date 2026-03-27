@@ -12,11 +12,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}${basePath}`
   : process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'http://localhost:3000'
+  ? `https://${process.env.VERCEL_URL}${basePath}`
+  : `http://localhost:3000${basePath}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

@@ -65,7 +65,9 @@ async function getAllFixtures(seasonId: string) {
       f.matchweek,
       f.kickoff_time,
       f.status,
+      ht.team_id::text AS home_team_id,
       ht.team_name AS home_team_name,
+      at.team_id::text AS away_team_id,
       at.team_name AS away_team_name,
       mr.score_home,
       mr.score_away
@@ -108,7 +110,9 @@ export type EnrichedFixture = {
   kickoff_time: string
   date: string       // DD/MM/YYYY in MVT
   day: string        // 'Friday' | 'Tuesday' etc.
+  home_team_id: string
   home_team_name: string
+  away_team_id: string
   away_team_name: string
   bye_team: string
   note: string
@@ -163,7 +167,9 @@ export default async function FixturesPage() {
       kickoff_time:   f.kickoff_time as string,
       date:           toMVTDateString(f.kickoff_time as string),
       day:            toMVTWeekday(f.kickoff_time as string),
+      home_team_id:   f.home_team_id as string,
       home_team_name: f.home_team_name as string,
+      away_team_id:   f.away_team_id as string,
       away_team_name: f.away_team_name as string,
       bye_team:       bye,
       note:           MW_NOTES[mw] ?? '',

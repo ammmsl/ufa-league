@@ -13,16 +13,21 @@ export async function PATCH(req: NextRequest) {
     )
   }
 
-  const result = await sql`
-    UPDATE seasons
-    SET status = ${status}
-    WHERE season_id = (SELECT season_id FROM seasons ORDER BY created_at DESC LIMIT 1)
-    RETURNING *
-  `
+  try {
+    const result = await sql`
+      UPDATE seasons
+      SET status = ${status}
+      WHERE season_id = (SELECT season_id FROM seasons ORDER BY created_at DESC LIMIT 1)
+      RETURNING *
+    `
 
-  if (result.length === 0) {
-    return NextResponse.json({ error: 'No season found' }, { status: 404 })
+    if (result.length === 0) {
+      return NextResponse.json({ error: 'No season found' }, { status: 404 })
+    }
+
+    return NextResponse.json(result[0])
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-
-  return NextResponse.json(result[0])
 }

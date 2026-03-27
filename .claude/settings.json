@@ -44,11 +44,18 @@
       "Bash(curl -s http://localhost:3000/player/8328a688-0dd5-45d8-834a-a2b078000e30)",
       "Bash(curl -s http://localhost:3000/admin/login)",
       "Bash(curl -s http://localhost:3000/admin/dashboard)",
-      "Bash(curl -s \"http://localhost:3000/match/079cc149-98db-4654-92a0-3168e9a5c789\")"
+      "Bash(curl -s \"http://localhost:3000/match/079cc149-98db-4654-92a0-3168e9a5c789\")",
+      "Read(//i/Projects/Frisbee.mv/frisbee.mv/**)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Amsal\\Desktop\\leageue\\ufa-league\\app\\api\\admin\\results",
-      "C:\\Users\\Amsal\\Desktop\\leageue\\ufa-league\\app\\api\\admin\\holidays"
+      "C:\\Users\\Amsal\\Desktop\\leageue\\ufa-league\\app\\api\\admin\\holidays",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\lib",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\app\\league\\mvp",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\app\\league\\stats",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\app\\league\\_components",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\app\\api\\league\\admin\\login",
+      "I:\\Projects\\Frisbee.mv\\frisbee.mv\\app\\league\\admin\\setup"
     ]
   }
 }

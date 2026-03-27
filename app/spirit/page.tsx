@@ -4,7 +4,7 @@ import PublicNav from '../_components/PublicNav'
 
 export const revalidate = 0
 
-async function getSpiritLeaderboard() {
+async function getSpiritLeaderboard(seasonId: string) {
   const rows = await sql`
     SELECT
       p.player_id::text,
@@ -15,6 +15,7 @@ async function getSpiritLeaderboard() {
     FROM spirit_nominations sn
     JOIN players p ON p.player_id = sn.nominated_player_id
     JOIN teams   t ON t.team_id   = p.team_id
+    WHERE p.season_id = ${seasonId}::uuid
     GROUP BY p.player_id, p.display_name, t.team_id, t.team_name
     ORDER BY nominations DESC, p.display_name
   `
@@ -22,7 +23,9 @@ async function getSpiritLeaderboard() {
 }
 
 export default async function SpiritPage() {
-  const leaderboard = await getSpiritLeaderboard()
+  const seasons = await sql`SELECT season_id::text FROM seasons WHERE status = 'active' LIMIT 1`
+  const seasonId = (seasons[0]?.season_id as string) ?? ''
+  const leaderboard = seasonId ? await getSpiritLeaderboard(seasonId) : []
 
   return (
     <div className="page-shell">

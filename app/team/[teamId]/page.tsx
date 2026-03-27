@@ -5,6 +5,7 @@ import { getStandings } from '@/lib/standings'
 import { ordinal } from '@/lib/utils'
 import PublicNav from '../../_components/PublicNav'
 import StatCard from '../../_components/StatCard'
+import { TeamAvatar } from '../../_components/Avatar'
 
 export const revalidate = 0
 
@@ -218,7 +219,10 @@ export default async function TeamPage({
         {/* Team header */}
         <div className="card-p5">
           <div className="flex items-start justify-between mb-3">
-            <h1 className="page-heading">{team.team_name as string}</h1>
+            <div className="flex items-center gap-3">
+              <TeamAvatar id={teamId} name={team.team_name as string} size={64} />
+              <h1 className="page-heading">{team.team_name as string}</h1>
+            </div>
             {leaguePosition > 0 && (
               <span className="badge badge-meta shrink-0 ml-3 mt-1">
                 {ordinal(leaguePosition)}

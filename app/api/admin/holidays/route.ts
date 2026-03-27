@@ -11,14 +11,18 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const rows = await sql`
-    SELECT *
-    FROM season_holidays
-    WHERE season_id = ${seasonId}
-    ORDER BY start_date ASC
-  `
-
-  return NextResponse.json(rows)
+  try {
+    const rows = await sql`
+      SELECT *
+      FROM season_holidays
+      WHERE season_id = ${seasonId}
+      ORDER BY start_date ASC
+    `
+    return NextResponse.json(rows)
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -38,11 +42,15 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const result = await sql`
-    INSERT INTO season_holidays (season_id, start_date, end_date, name)
-    VALUES (${season_id}, ${start_date}, ${end_date}, ${name})
-    RETURNING *
-  `
-
-  return NextResponse.json(result[0], { status: 201 })
+  try {
+    const result = await sql`
+      INSERT INTO season_holidays (season_id, start_date, end_date, name)
+      VALUES (${season_id}, ${start_date}, ${end_date}, ${name})
+      RETURNING *
+    `
+    return NextResponse.json(result[0], { status: 201 })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

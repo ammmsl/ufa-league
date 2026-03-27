@@ -16,23 +16,28 @@ export async function PATCH(
     return NextResponse.json({ error: 'Teams must be different' }, { status: 400 })
   }
 
-  const result = await sql`
-    UPDATE fixtures
-    SET
-      home_team_id = ${home_team_id},
-      away_team_id = ${away_team_id},
-      kickoff_time = ${kickoff_time},
-      venue        = ${venue ?? 'Vilimale Turf'},
-      matchweek    = ${matchweek}
-    WHERE match_id = ${matchId}
-    RETURNING *
-  `
+  try {
+    const result = await sql`
+      UPDATE fixtures
+      SET
+        home_team_id = ${home_team_id},
+        away_team_id = ${away_team_id},
+        kickoff_time = ${kickoff_time},
+        venue        = ${venue ?? 'Vilimale Turf'},
+        matchweek    = ${matchweek}
+      WHERE match_id = ${matchId}
+      RETURNING *
+    `
 
-  if (result.length === 0) {
-    return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+    if (result.length === 0) {
+      return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(result[0])
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-
-  return NextResponse.json(result[0])
 }
 
 export async function DELETE(
@@ -41,13 +46,18 @@ export async function DELETE(
 ) {
   const { matchId } = await params
 
-  const result = await sql`
-    DELETE FROM fixtures WHERE match_id = ${matchId} RETURNING match_id
-  `
+  try {
+    const result = await sql`
+      DELETE FROM fixtures WHERE match_id = ${matchId} RETURNING match_id
+    `
 
-  if (result.length === 0) {
-    return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+    if (result.length === 0) {
+      return NextResponse.json({ error: 'Fixture not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ deleted: matchId })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-
-  return NextResponse.json({ deleted: matchId })
 }

@@ -2,32 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+const COOKIE = 'ufa_admin_session'
 
 export async function proxy(req: NextRequest) {
-  const isAdminRoute =
-    req.nextUrl.pathname.startsWith('/admin') ||
-    req.nextUrl.pathname.startsWith('/api/admin')
+  const { pathname } = req.nextUrl
 
-  const isLoginRoute =
-    req.nextUrl.pathname === '/admin/login' ||
-    req.nextUrl.pathname === '/api/admin/login'
-
-  // Allow non-admin routes and the login route to pass through
-  if (!isAdminRoute || isLoginRoute) return NextResponse.next()
-
-  const token = req.cookies.get('ufa_admin_session')?.value
-
-  if (!token) {
-    return NextResponse.redirect(new URL('/admin/login', req.url))
+  const token = req.cookies.get(COOKIE)?.value
+  let isAuth = false
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(token, secret)
+      isAuth = payload.role === 'admin'
+    } catch { /* invalid token */ }
   }
 
-  try {
-    const { payload } = await jwtVerify(token, secret)
-    if (payload.role !== 'admin') throw new Error('Not admin')
+  // API routes — return 401 JSON (consumed by fetch(), no redirect)
+  if (pathname.startsWith('/api/admin/')) {
+    if (!isAuth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     return NextResponse.next()
-  } catch {
-    return NextResponse.redirect(new URL('/admin/login', req.url))
   }
+
+  // Admin UI pages — redirect to login
+  if (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/login')) {
+    if (!isAuth) return NextResponse.redirect(new URL('/admin/login', req.url))
+    return NextResponse.next()
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {

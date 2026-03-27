@@ -163,7 +163,7 @@ lib/
   auth.ts               — JWT sign/verify, getAdminSession, COOKIE_NAME_EXPORT
   db.ts                 — postgres client (max:1, ssl:require)
   schedule.ts           — game day helpers, auto-scheduler
-middleware.ts           — JWT guard for /admin/* and /api/admin/*
+proxy.ts                — JWT guard for /admin/* and /api/admin/* (Next.js 16.1+ proxy convention)
 docs/
   BUILD-PROGRESS.md
   UFA-League-Tracker-Implementation-Plan-v1.2.md
@@ -216,3 +216,4 @@ ADMIN_PASSWORD_HASH — bcryptjs hash, never plaintext
 - `sql.begin()` for any multi-table write — never sequential awaits without transaction
 - `kickoff_time` inserts need `+05:00` offset or Postgres stores 5h behind
 - `.env.local` values containing `$` must escape as `\$` — Next.js uses `dotenv-expand` which performs `$VAR` interpolation on all values (even single-quoted ones). The `\$` escape survives interpolation and is resolved to `$` afterward. Affects bcrypt hashes and any secret with `$`.
+- **No `middleware.ts`** — Next.js 16.1+ uses `proxy.ts` (not `middleware.ts`). The auth guard lives in `proxy.ts` at the repo root. Do not create or regenerate `middleware.ts`.

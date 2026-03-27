@@ -14,19 +14,10 @@ import {
   Bar,
   Cell,
 } from 'recharts'
-import type { StatRow, MatchweekRow, StatsClientProps } from './page'
+import type { MvpRow, MvpHistoryRow, MvpClientProps } from './page'
 import { PlayerAvatar } from '../_components/Avatar'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-type StatTab = 'goals' | 'assists' | 'blocks' | 'apps'
-
-const TABS: { key: StatTab; label: string }[] = [
-  { key: 'goals',   label: 'Goals'   },
-  { key: 'assists', label: 'Assists' },
-  { key: 'blocks',  label: 'Blocks'  },
-  { key: 'apps',    label: 'Apps'    },
-]
 
 const LINE_COLORS = [
   '#4ade80', // green-400
@@ -39,6 +30,19 @@ const LINE_COLORS = [
 
 const TEAM_BAR_COLORS = ['bg-green-500', 'bg-blue-500', 'bg-pink-500', 'bg-orange-400', 'bg-violet-500']
 
+const MEDAL = {
+  0: { ring: 'ring-yellow-400', bg: 'bg-yellow-400/10', numColor: 'text-yellow-400', label: '1st' },
+  1: { ring: 'ring-gray-400',   bg: 'bg-gray-400/10',   numColor: 'text-gray-300',   label: '2nd' },
+  2: { ring: 'ring-amber-600',  bg: 'bg-amber-700/10',  numColor: 'text-amber-500',  label: '3rd' },
+} as const
+
+const BREAKDOWN_COLORS = {
+  goals:   '#4ade80', // green-400
+  assists: '#60a5fa', // blue-400
+  blocks:  '#f472b6', // pink-400
+  mvp:     '#fbbf24', // amber-400
+}
+
 function abbrevTeam(name: string): string {
   if (name.length > 15 && name.includes(' ')) {
     return name.split(' ').map(w => w[0].toUpperCase()).join('')
@@ -46,38 +50,48 @@ function abbrevTeam(name: string): string {
   return name
 }
 
-const MEDAL = {
-  0: { ring: 'ring-yellow-400', bg: 'bg-yellow-400/10', numColor: 'text-yellow-400', label: '1st' },
-  1: { ring: 'ring-gray-400',   bg: 'bg-gray-400/10',   numColor: 'text-gray-300',   label: '2nd' },
-  2: { ring: 'ring-amber-600',  bg: 'bg-amber-700/10',  numColor: 'text-amber-500',  label: '3rd' },
-} as const
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function TabBar({ tab, onChange }: { tab: StatTab; onChange: (t: StatTab) => void }) {
+function LeaderCard({ row }: { row: MvpRow }) {
   return (
-    <div className="flex gap-1 bg-gray-900 rounded-xl p-1">
-      {TABS.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => onChange(key)}
-          className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
-            tab === key
-              ? 'bg-green-600 text-white shadow'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="flex flex-col justify-center bg-gradient-to-br from-green-900/30 to-gray-900 rounded-xl p-5 border border-green-800/40 h-full">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-green-400 mb-3">
+        Season MVP Leader
+      </p>
+      <div className="flex items-center gap-3 mb-1">
+        <PlayerAvatar id={row.player_id} name={row.display_name} size={48} />
+        <div>
+          <Link href={`/player/${row.player_id}`} className="hover:text-green-400 transition-colors">
+            <p className="text-xl font-black text-white leading-tight">{row.display_name}</p>
+          </Link>
+          <p className="text-xs text-gray-400 mt-0.5">{row.team_name}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex items-baseline gap-2">
+        <span className="text-5xl font-black text-green-400 tabular-nums">{row.composite_score}</span>
+        <span className="text-sm text-gray-400">pts</span>
+      </div>
+      <p className="text-[10px] text-gray-500 mt-2 font-mono">G×3 + A×3 + B×2 + MVP×5</p>
+      <div className="mt-3 grid grid-cols-4 gap-1 text-center">
+        {[
+          { label: 'Goals', val: row.total_goals,    color: 'text-green-400' },
+          { label: 'Asst',  val: row.total_assists,  color: 'text-blue-400'  },
+          { label: 'Blks',  val: row.total_blocks,   color: 'text-pink-400'  },
+          { label: 'MVP',   val: row.match_mvp_wins, color: 'text-amber-400' },
+        ].map(({ label, val, color }) => (
+          <div key={label} className="bg-gray-800/60 rounded-lg py-1.5">
+            <p className={`text-base font-bold tabular-nums ${color}`}>{val}</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-wider">{label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-function Podium({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
+function Podium({ rows }: { rows: MvpRow[] }) {
   const top3 = rows.slice(0, 3)
-  if (top3.length === 0 || top3[0].total === 0) return null
-  const unit = tab === 'goals' ? 'G' : tab === 'assists' ? 'A' : tab === 'blocks' ? 'B' : 'Apps'
+  if (top3.length === 0 || top3[0].composite_score === 0) return null
 
   return (
     <div className="grid grid-cols-3 gap-2 items-end">
@@ -97,9 +111,9 @@ function Podium({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
             </span>
             <PlayerAvatar id={row.player_id} name={row.display_name} size={i === 0 ? 44 : 36} />
             <span className={`text-3xl font-black tabular-nums ${medal.numColor}`}>
-              {row.total}
+              {row.composite_score}
             </span>
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest">{unit}</span>
+            <span className="text-[10px] text-gray-400 uppercase tracking-widest">pts</span>
             <span className="text-xs font-bold text-white leading-tight mt-1">
               {row.display_name}
             </span>
@@ -113,43 +127,11 @@ function Podium({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
   )
 }
 
-function LeaderCard({ row, tab }: { row: StatRow; tab: StatTab }) {
-  const statLabel = tab === 'goals' ? 'Goals' : tab === 'assists' ? 'Assists' :
-                    tab === 'blocks' ? 'Blocks' : 'Appearances'
-  return (
-    <div className="flex flex-col justify-center bg-gradient-to-br from-green-900/30 to-gray-900 rounded-xl p-5 border border-green-800/40 h-full">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-green-400 mb-3">
-        Season Leader
-      </p>
-      <div className="flex items-center gap-3 mb-1">
-        <PlayerAvatar id={row.player_id} name={row.display_name} size={48} />
-        <div>
-          <Link href={`/player/${row.player_id}`} className="hover:text-green-400 transition-colors">
-            <p className="text-xl font-black text-white leading-tight">{row.display_name}</p>
-          </Link>
-          <p className="text-xs text-gray-400 mt-0.5">{row.team_name}</p>
-        </div>
-      </div>
-      <div className="mt-4 flex items-baseline gap-2">
-        <span className="text-5xl font-black text-green-400 tabular-nums">{row.total}</span>
-        <span className="text-sm text-gray-400">{statLabel}</span>
-      </div>
-      {row.per_game != null && (
-        <p className="text-xs text-gray-500 mt-2">
-          {row.per_game.toFixed(1)} per game · {row.appearances} apps
-        </p>
-      )}
-      {row.per_game == null && (
-        <p className="text-xs text-gray-500 mt-2">{row.appearances} appearances</p>
-      )}
-    </div>
-  )
-}
+// ─── Trend Chart ──────────────────────────────────────────────────────────────
 
-type ChartPoint = { matchweek: number; value: number }
+type ChartPoint  = { matchweek: number; value: number }
 type ChartSeries = { player_id: string; display_name: string; data: ChartPoint[] }
 
-// Tooltip that re-sorts players by their value at the hovered matchweek
 function TrendTooltip({ active, payload, label }: {
   active?: boolean
   payload?: Array<{ name: string; value: number; color: string }>
@@ -177,14 +159,11 @@ function TrendTooltip({ active, payload, label }: {
   )
 }
 
-function TrendChart({ series, tab }: { series: ChartSeries[]; tab: StatTab }) {
-  const label = tab === 'goals' ? 'Goals' : tab === 'assists' ? 'Assists' :
-                tab === 'blocks' ? 'Blocks' : 'Appearances'
-
+function TrendChart({ series }: { series: ChartSeries[] }) {
   if (series.length === 0) {
     return (
       <div className="bg-gray-900 rounded-xl p-4">
-        <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">Season Progression — {label}</p>
+        <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">Score Progression</p>
         <div className="h-40 flex items-center justify-center text-gray-500 text-sm">
           No match data yet.
         </div>
@@ -195,7 +174,7 @@ function TrendChart({ series, tab }: { series: ChartSeries[]; tab: StatTab }) {
   return (
     <div className="bg-gray-900 rounded-xl p-4">
       <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">
-        Season Progression — {label} (top 6)
+        Score Progression (top 6)
       </p>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart margin={{ top: 8, right: 24, left: -10, bottom: 4 }}>
@@ -240,71 +219,129 @@ function TrendChart({ series, tab }: { series: ChartSeries[]; tab: StatTab }) {
   )
 }
 
-type EffItem = { name: string; per_game: number; total: number; player_id: string }
+// ─── Score Breakdown Panel ────────────────────────────────────────────────────
 
-function BarTooltip({ active, payload, label }: {
+type BreakdownItem = {
+  name:      string
+  player_id: string
+  goals_pts: number
+  asst_pts:  number
+  blks_pts:  number
+  mvp_pts:   number
+}
+
+function BreakdownTooltip({ active, payload, label }: {
   active?: boolean
-  payload?: Array<{ value: number }>
+  payload?: Array<{ name: string; value: number; color: string }>
   label?: string
 }) {
   if (!active || !payload || payload.length === 0) return null
   return (
     <div style={{
       background: '#111827', border: '1px solid #374151',
-      borderRadius: 8, padding: '8px 12px', fontSize: 11,
+      borderRadius: 8, padding: '8px 12px', fontSize: 11, minWidth: 150,
     }}>
-      <p style={{ color: '#9ca3af', marginBottom: 4 }}>{label}</p>
-      <p style={{ color: '#4ade80', fontWeight: 700 }}>
-        {payload[0].value.toFixed(2)}{' '}
-        <span style={{ color: '#9ca3af', fontWeight: 400 }}>per game</span>
-      </p>
+      <p style={{ color: '#9ca3af', marginBottom: 6 }}>{label}</p>
+      {[...payload].reverse().map((entry) => (
+        <div key={entry.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 3 }}>
+          <span style={{ color: entry.color }}>{entry.name}</span>
+          <span style={{ color: '#e5e7eb', fontWeight: 700 }}>{entry.value}</span>
+        </div>
+      ))}
+      <div style={{ borderTop: '1px solid #374151', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ color: '#9ca3af' }}>Total</span>
+        <span style={{ color: '#4ade80', fontWeight: 700 }}>
+          {payload.reduce((s, e) => s + e.value, 0)}
+        </span>
+      </div>
     </div>
   )
 }
 
-function EfficiencyPanel({ data, tab }: { data: EffItem[]; tab: StatTab }) {
-  if (tab === 'apps' || data.length === 0) return null
-  const label = tab === 'goals' ? 'Goals' : tab === 'assists' ? 'Assists' : 'Blocks'
+function ScoreBreakdownPanel({ rows }: { rows: MvpRow[] }) {
+  const data: BreakdownItem[] = rows
+    .filter(r => r.composite_score > 0)
+    .slice(0, 8)
+    .map(r => ({
+      name:      r.display_name.split(' ')[0],
+      player_id: r.player_id,
+      goals_pts: r.total_goals    * 3,
+      asst_pts:  r.total_assists  * 3,
+      blks_pts:  r.total_blocks   * 2,
+      mvp_pts:   r.match_mvp_wins * 5,
+    }))
+
+  if (data.length === 0) {
+    return (
+      <div className="bg-gray-900 rounded-xl p-4">
+        <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">Score Breakdown</p>
+        <div className="h-40 flex items-center justify-center text-gray-500 text-sm">No data yet.</div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-gray-900 rounded-xl p-4">
-      <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
-        Per-Game Efficiency — {label}
-      </p>
-      <p className="text-[10px] text-gray-500 mb-3">Min. 3 appearances</p>
-      <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={data} margin={{ top: 4, right: 12, left: -10, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-          <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} interval={0} />
-          <YAxis width={32} tick={{ fill: '#9ca3af', fontSize: 10 }} />
-          <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-          <Bar dataKey="per_game" name="Per Game" radius={[4, 4, 0, 0]}>
-            {data.map((_, i) => (
-              <Cell key={i} fill={i === 0 ? '#4ade80' : '#374151'} />
-            ))}
-          </Bar>
+      <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Score Breakdown (top 8)</p>
+      <p className="text-[10px] text-gray-500 mb-3">How each player's points are earned</p>
+      <ResponsiveContainer width="100%" height={data.length * 36 + 16}>
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+          barSize={12}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+          <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} />
+          <YAxis type="category" dataKey="name" width={52} tick={{ fill: '#9ca3af', fontSize: 10 }} />
+          <Tooltip content={<BreakdownTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+          <Bar dataKey="goals_pts" name="Goals"    stackId="a" fill={BREAKDOWN_COLORS.goals}   radius={[0,0,0,0]} />
+          <Bar dataKey="asst_pts"  name="Assists"  stackId="a" fill={BREAKDOWN_COLORS.assists}  radius={[0,0,0,0]} />
+          <Bar dataKey="blks_pts"  name="Blocks"   stackId="a" fill={BREAKDOWN_COLORS.blocks}   radius={[0,0,0,0]} />
+          <Bar dataKey="mvp_pts"   name="MVP wins" stackId="a" fill={BREAKDOWN_COLORS.mvp}      radius={[0,4,4,0]} />
         </BarChart>
       </ResponsiveContainer>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+        {[
+          { label: 'Goals ×3',    color: BREAKDOWN_COLORS.goals   },
+          { label: 'Assists ×3',  color: BREAKDOWN_COLORS.assists  },
+          { label: 'Blocks ×2',   color: BREAKDOWN_COLORS.blocks   },
+          { label: 'MVP wins ×5', color: BREAKDOWN_COLORS.mvp      },
+        ].map(({ label, color }) => (
+          <div key={label} className="flex items-center gap-1.5 text-xs text-gray-400">
+            <span className="w-3 h-2.5 rounded-sm inline-block" style={{ background: color }} />
+            {label}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-type TeamTotal = { name: string; value: number }
+// ─── Team Contribution Panel ──────────────────────────────────────────────────
 
-function TeamBreakdownPanel({ teamTotals, tab }: { teamTotals: TeamTotal[]; tab: StatTab }) {
-  if (teamTotals.length === 0) return null
-  const grand = teamTotals.reduce((s, t) => s + t.value, 0)
+function TeamContributionPanel({ rows }: { rows: MvpRow[] }) {
+  const teamMap = new Map<string, number>()
+  for (const row of rows) {
+    if (row.composite_score > 0) {
+      teamMap.set(row.team_name, (teamMap.get(row.team_name) ?? 0) + row.composite_score)
+    }
+  }
+  const teams = Array.from(teamMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+
+  if (teams.length === 0) return null
+  const grand = teams.reduce((s, t) => s + t.value, 0)
   if (grand === 0) return null
-  const statLabel = tab === 'goals' ? 'Goals' : tab === 'assists' ? 'Assists' :
-                    tab === 'blocks' ? 'Blocks' : 'Appearances'
 
   return (
     <div className="bg-gray-900 rounded-xl p-4">
       <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">
-        Team {statLabel} Contribution
+        Team Score Contribution
       </p>
       <div className="space-y-3">
-        {teamTotals.map((t, i) => (
+        {teams.map((t, i) => (
           <div key={t.name}>
             <div className="flex justify-between text-xs mb-1">
               <span className="text-gray-300 font-medium">{abbrevTeam(t.name)}</span>
@@ -325,30 +362,29 @@ function TeamBreakdownPanel({ teamTotals, tab }: { teamTotals: TeamTotal[]; tab:
   )
 }
 
-function StatTable({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
-  const showPerGame = tab !== 'apps'
-  const label = TABS.find(t => t.key === tab)!.label
+// ─── Full Rankings Table ──────────────────────────────────────────────────────
 
+function RankingsTable({ rows }: { rows: MvpRow[] }) {
   return (
     <div className="bg-gray-900 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-xs font-semibold text-white uppercase tracking-widest">
-          {label} — Full Rankings
+          Full Rankings
         </h2>
         <span className="text-xs text-gray-400">{rows.length} players</span>
       </div>
       <div className="max-h-80 overflow-y-auto overflow-x-auto">
-        <table className="w-full text-sm min-w-[420px]">
+        <table className="w-full text-sm min-w-[480px]">
           <thead className="sticky top-0 bg-gray-900 z-10">
             <tr className="text-gray-500 text-xs border-b border-gray-800">
               <th className="text-left py-2 px-4 font-normal w-8">#</th>
               <th className="text-left py-2 px-2 font-normal">Player</th>
               <th className="text-left py-2 px-2 font-normal">Team</th>
-              <th className="text-right py-2 px-2 font-normal">Total</th>
-              <th className="text-right py-2 px-2 font-normal">Apps</th>
-              {showPerGame && (
-                <th className="text-right py-2 px-4 font-normal">Per Game</th>
-              )}
+              <th className="text-right py-2 px-2 font-normal text-green-400">Score</th>
+              <th className="text-right py-2 px-2 font-normal">G</th>
+              <th className="text-right py-2 px-2 font-normal">A</th>
+              <th className="text-right py-2 px-2 font-normal">B</th>
+              <th className="text-right py-2 px-4 font-normal">MVP</th>
             </tr>
           </thead>
           <tbody>
@@ -372,17 +408,21 @@ function StatTable({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
                   </div>
                 </td>
                 <td className="py-2 px-2 text-gray-400">
-                  <Link href={`/team/${row.team_id}`} className="hover:text-white transition-colors" title={row.team_name}>
+                  <Link
+                    href={`/team/${row.team_id}`}
+                    className="hover:text-white transition-colors"
+                    title={row.team_name}
+                  >
                     {abbrevTeam(row.team_name)}
                   </Link>
                 </td>
-                <td className="py-2 px-2 text-right font-semibold">{row.total}</td>
-                <td className="py-2 px-2 text-right text-gray-400">{row.appearances}</td>
-                {showPerGame && (
-                  <td className="py-2 px-4 text-right text-gray-400">
-                    {row.per_game != null ? row.per_game.toFixed(1) : '—'}
-                  </td>
-                )}
+                <td className="py-2 px-2 text-right font-bold text-green-400 tabular-nums">
+                  {row.composite_score}
+                </td>
+                <td className="py-2 px-2 text-right text-gray-400 tabular-nums">{row.total_goals}</td>
+                <td className="py-2 px-2 text-right text-gray-400 tabular-nums">{row.total_assists}</td>
+                <td className="py-2 px-2 text-right text-gray-400 tabular-nums">{row.total_blocks}</td>
+                <td className="py-2 px-4 text-right text-gray-400 tabular-nums">{row.match_mvp_wins}</td>
               </tr>
             ))}
           </tbody>
@@ -394,40 +434,22 @@ function StatTable({ rows, tab }: { rows: StatRow[]; tab: StatTab }) {
 
 // ─── Main Client Component ────────────────────────────────────────────────────
 
-export default function StatsClient({
-  seasonName, goals, assists, blocks, appearances, history,
-}: StatsClientProps) {
-  const [tab, setTab] = useState<StatTab>('goals')
+export default function MvpClient({ seasonName, rows, history }: MvpClientProps) {
   const [mounted, setMounted] = useState(false)
-
   useEffect(() => { setMounted(true) }, [])
 
-  const { activeRows, histSeries, teamTotals, efficiencyData } = useMemo(() => {
-    const activeRows =
-      tab === 'goals'   ? goals   :
-      tab === 'assists' ? assists :
-      tab === 'blocks'  ? blocks  :
-      appearances
-
-    // Build cumulative chart series for top 6 players
-    const cumKey = (
-      tab === 'goals'   ? 'cum_goals'   :
-      tab === 'assists' ? 'cum_assists'  :
-      tab === 'blocks'  ? 'cum_blocks'   :
-      'cum_apps'
-    ) as keyof MatchweekRow
-
+  const trendSeries = useMemo((): ChartSeries[] => {
     const playerMap = new Map<string, { display_name: string; data: Map<number, number> }>()
     for (const row of history) {
       if (!playerMap.has(row.player_id)) {
         playerMap.set(row.player_id, { display_name: row.display_name, data: new Map() })
       }
-      playerMap.get(row.player_id)!.data.set(row.matchweek, row[cumKey] as number)
+      playerMap.get(row.player_id)!.data.set(row.matchweek, row.cum_composite)
     }
 
     const allMW = [...new Set(history.map(r => r.matchweek))].sort((a, b) => a - b)
 
-    const ranked = Array.from(playerMap.entries())
+    return Array.from(playerMap.entries())
       .map(([pid, d]) => ({
         player_id:    pid,
         display_name: d.display_name,
@@ -437,75 +459,46 @@ export default function StatsClient({
       .filter(p => p.max > 0)
       .sort((a, b) => b.max - a.max)
       .slice(0, 6)
-
-    const histSeries: ChartSeries[] = ranked.map((p) => ({
-      player_id:    p.player_id,
-      display_name: p.display_name,
-      data: allMW.map(mw => {
-        if (p.data.has(mw)) return { matchweek: mw, value: p.data.get(mw)! }
-        // forward-fill from last known value
-        const prevMWs = allMW.filter(m => m < mw && p.data.has(m))
-        const value = prevMWs.length > 0 ? p.data.get(prevMWs[prevMWs.length - 1])! : 0
-        return { matchweek: mw, value }
-      }),
-    }))
-
-    // Team totals
-    const teamTotalsMap = new Map<string, number>()
-    for (const row of activeRows) {
-      if (row.total > 0) {
-        teamTotalsMap.set(row.team_name, (teamTotalsMap.get(row.team_name) ?? 0) + row.total)
-      }
-    }
-    const teamTotals: TeamTotal[] = Array.from(teamTotalsMap.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-
-    // Efficiency data (per-game bar chart)
-    const efficiencyData: EffItem[] = activeRows
-      .filter(r => r.appearances >= 3 && r.per_game != null && r.total > 0)
-      .slice(0, 8)
-      .map(r => ({
-        name:      r.display_name.split(' ')[0],
-        per_game:  r.per_game!,
-        total:     r.total,
-        player_id: r.player_id,
+      .map(p => ({
+        player_id:    p.player_id,
+        display_name: p.display_name,
+        data: allMW.map(mw => {
+          if (p.data.has(mw)) return { matchweek: mw, value: p.data.get(mw)! }
+          const prevMWs = allMW.filter(m => m < mw && p.data.has(m))
+          const value = prevMWs.length > 0 ? p.data.get(prevMWs[prevMWs.length - 1])! : 0
+          return { matchweek: mw, value }
+        }),
       }))
+  }, [history])
 
-    return { activeRows, histSeries, teamTotals, efficiencyData }
-  }, [tab, goals, assists, blocks, appearances, history])
-
-  const leader = activeRows[0]
+  const leader = rows[0]
 
   return (
     <>
       {/* ── Mobile — all panels stacked ───────────────────────────────────── */}
       <div className="md:hidden max-w-lg mx-auto px-4 pb-16 pt-6 space-y-5">
         <div>
-          <h1 className="text-2xl font-bold mb-0.5">Stats</h1>
+          <h1 className="text-2xl font-bold mb-0.5">MVP Race</h1>
           <p className="text-gray-400 text-sm">{seasonName}</p>
         </div>
-        <TabBar tab={tab} onChange={setTab} />
-        {leader && leader.total > 0 && <LeaderCard row={leader} tab={tab} />}
-        <Podium rows={activeRows} tab={tab} />
-        {mounted && <TrendChart series={histSeries} tab={tab} />}
-        <TeamBreakdownPanel teamTotals={teamTotals} tab={tab} />
-        {mounted && <EfficiencyPanel data={efficiencyData} tab={tab} />}
-        <StatTable rows={activeRows} tab={tab} />
+        {leader && leader.composite_score > 0 && <LeaderCard row={leader} />}
+        <Podium rows={rows} />
+        {mounted && <TrendChart series={trendSeries} />}
+        <TeamContributionPanel rows={rows} />
+        {mounted && <ScoreBreakdownPanel rows={rows} />}
+        <RankingsTable rows={rows} />
       </div>
 
       {/* ── Desktop — dashboard grid ───────────────────────────────────────── */}
       <div className="hidden md:block max-w-6xl mx-auto px-6 pb-16 pt-6 space-y-6">
         <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl font-bold">Stats</h1>
+          <h1 className="text-2xl font-bold">MVP Race</h1>
           <p className="text-gray-400 text-sm">{seasonName}</p>
         </div>
 
-        <TabBar tab={tab} onChange={setTab} />
-
         <div className="grid grid-cols-3 gap-6 items-stretch">
-          {leader && leader.total > 0 ? (
-            <LeaderCard row={leader} tab={tab} />
+          {leader && leader.composite_score > 0 ? (
+            <LeaderCard row={leader} />
           ) : (
             <div className="bg-gray-900 rounded-xl p-5 flex items-center justify-center text-gray-500 text-sm">
               No data yet
@@ -513,19 +506,19 @@ export default function StatsClient({
           )}
           <div className="col-span-2 flex items-end">
             <div className="w-full">
-              <Podium rows={activeRows} tab={tab} />
+              <Podium rows={rows} />
             </div>
           </div>
         </div>
 
-        {mounted && <TrendChart series={histSeries} tab={tab} />}
+        {mounted && <TrendChart series={trendSeries} />}
 
         <div className="grid grid-cols-2 gap-6">
-          <TeamBreakdownPanel teamTotals={teamTotals} tab={tab} />
-          {mounted && <EfficiencyPanel data={efficiencyData} tab={tab} />}
+          <TeamContributionPanel rows={rows} />
+          {mounted && <ScoreBreakdownPanel rows={rows} />}
         </div>
 
-        <StatTable rows={activeRows} tab={tab} />
+        <RankingsTable rows={rows} />
       </div>
     </>
   )

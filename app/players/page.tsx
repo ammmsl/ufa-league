@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import sql from '@/lib/db'
 import PublicNav from '../_components/PublicNav'
+import { TeamAvatar, PlayerAvatar } from '../_components/Avatar'
 
 export const revalidate = 0
 
@@ -58,11 +59,12 @@ export default async function PlayersPage() {
 
         {teams.map(([teamId, { team_name, players: teamPlayers }]) => (
           <div key={teamId}>
-            <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-center justify-between mb-2">
               <Link
                 href={`/team/${teamId}`}
-                className="text-xs uppercase tracking-widest link-accent"
+                className="flex items-center gap-2 text-xs uppercase tracking-widest link-accent"
               >
+                <TeamAvatar id={teamId} name={team_name} size={20} />
                 {team_name}
               </Link>
               <span className="text-xs text-gray-600">{teamPlayers.length}</span>
@@ -72,9 +74,10 @@ export default async function PlayersPage() {
                 <Link
                   key={p.player_id}
                   href={`/player/${p.player_id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors"
                 >
-                  <span className="text-sm">{p.display_name}</span>
+                  <PlayerAvatar id={p.player_id} name={p.display_name} size={28} />
+                  <span className="text-sm flex-1">{p.display_name}</span>
                   <span className="text-gray-600">›</span>
                 </Link>
               ))}

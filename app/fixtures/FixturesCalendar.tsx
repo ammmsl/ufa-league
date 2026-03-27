@@ -14,6 +14,7 @@ import {
   List,
 } from 'lucide-react'
 import type { EnrichedFixture, HolidayRow } from './page'
+import { TeamAvatar } from '../_components/Avatar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -639,8 +640,9 @@ export default function FixturesCalendar({
                         </div>
 
                         <div className="flex items-center justify-between text-center gap-1.5 mb-2">
-                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${homeChipClass}`}>
-                            {item.home_team_name}
+                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate flex items-center gap-1.5 ${homeChipClass}`}>
+                            <TeamAvatar id={item.home_team_id} name={item.home_team_name} size={16} />
+                            <span className="truncate">{item.home_team_name}</span>
                           </div>
                           {isCompleted ? (
                             <span className={`font-black text-xl px-2 min-w-[3.5rem] text-center ${isDraw ? 'text-amber-400' : 'text-white'}`}>
@@ -649,8 +651,9 @@ export default function FixturesCalendar({
                           ) : (
                             <span className="text-gray-500 font-bold text-[9px] uppercase px-1 min-w-[3rem] text-center">vs</span>
                           )}
-                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate ${awayChipClass}`}>
-                            {item.away_team_name}
+                          <div className={`flex-1 p-1.5 rounded-md font-bold text-xs truncate flex items-center justify-end gap-1.5 ${awayChipClass}`}>
+                            <span className="truncate">{item.away_team_name}</span>
+                            <TeamAvatar id={item.away_team_id} name={item.away_team_name} size={16} />
                           </div>
                         </div>
 
